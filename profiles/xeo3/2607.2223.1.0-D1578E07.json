@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 5,
+  "inherits": "2607.1523.1.0-D1578E07.json",
+  "package": {
+    "name": "Xbox360BackwardCompatibil.PrimaryFuzionFrenzyFuzio",
+    "familyName": "Xbox360BackwardCompatibil.PrimaryFuzionFrenzyFuzio_ksqcvrsvwz2jp",
+    "version": "2607.2223.1.0"
+  },
+  "emu": {
+    "sha256": "D1578E07B533E391D8A81C330D5493BA2D45B252490A818EC148DABE1BA24D06",
+    "imageBase": "0x140000000",
+    "peTimestamp": "0x6A585A77",
+    "sizeOfImage": "0x00D97000"
+  },
+  "vgpuDx12": {
+    "sha256": "17BDCD5866B58DBC50C8BB8C8EC5F9D9BEDFBA81D31DE530760FDE38A8E0EB1D",
+    "peTimestamp": "0x6A619423",
+    "sizeOfImage": "0x0073D000",
+    "status": "confirmed-installed-package-and-bridge-fingerprint"
+  },
+  "flashKernel": {
+    "path": "Flash/xboxkrnlcf.bin",
+    "sha256": "DA5BE614FB51B5809D70DA073F406F071E5CCB1F8C0EBCD57DAFBAB31B519BDD",
+    "imageBase": "0x80040000",
+    "size": 1507328,
+    "layout": "flat Flash image; guest RVA is file offset despite PE section raw pointers"
+  },
+  "kernelAot": {
+    "module": "xeo3_5fb3687c_001748c4.dll",
+    "sha256": "27CA5876B505361F00C3E1021FF06B68CD666987D4B517C934D69AADF44E8651",
+    "peTimestamp": "0x6A588000",
+    "sizeOfImage": "0x0013E000",
+    "imageBase": "0x180000000",
+    "mappings": [
+      {
+        "guestRva": "0x0001EEC8",
+        "guestIar": "0x8005EEC8",
+        "hostRva": "0x00021899",
+        "purpose": "KeBugCheckEx",
+        "hostBytesSha256": "7E106F74FB128E76C63F5C21CEC574BD040AE9A5F213D718AD871ED8B3D3B15C"
+      }
+    ],
+    "status": "confirmed-static-mapping-and-loaded-image-fingerprint-test"
+  },
+  "executionFailure": {
+    "message": "Unable to execute precompiled code for IAR 0x%x",
+    "missionFailureCallsiteRva": "0x0005FE78",
+    "resolverEntryRva": "0x0005FE40",
+    "resolverTargetRva": "0x000610D0",
+    "cpuStateObjectRegister": "RDI",
+    "cpuStateAnchorOffset": "0x80",
+    "guestMemoryRegister": "R15",
+    "guestIarRegister": "EBX",
+    "status": "confirmed-static-and-mission-failure"
+  },
+  "stateSynchronization": {
+    "mode": "fully-eager-asynchronous-coherence",
+    "localIarField": "PPCContext::xeo3GuestIar",
+    "indirectCallCheckpointInterval": 16,
+    "eagerState": [
+      "IAR",
+      "all GPRs",
+      "CR fields",
+      "LR",
+      "CTR",
+      "XER",
+      "MSR",
+      "FPRs",
+      "VMX registers",
+      "FPSCR",
+      "VSCR"
+    ],
+    "fullFlushBoundaries": [
+      "native import",
+      "native dispatch fallback",
+      "MMIO callback",
+      "translated dispatch exit",
+      "periodic indirect-call checkpoint"
+    ],
+    "reason": "both lazy-all and lazy-SIMD live Mission 01 runs stopped presenting at archive read 211 while worker callbacks advanced; XeO3 asynchronous scheduling requires every guest register class to remain live"
+  },
+  "kernelContinuation": {
+    "guestIar": "0x8005F0B4",
+    "effectiveEntry": "0x8005F0B8",
+    "dispatchSlotFormula": "dispatchBase + guestIar * 2",
+    "expectedUnmappedTarget": "0x0",
+    "bridgeTarget": "XeO3AotThunk",
+    "semantics": "KeBugCheck wrapper: preserve r3 and LR, zero r4-r7, tail-branch to KeBugCheckEx",
+    "nativeExecutionFallback": "direct pinned KeBugCheckEx kernel AOT host entry when the absolute XeO3 dispatch slot is unavailable",
+    "fingerprintSource": "both the read-only flat Flash/xboxkrnlcf.bin image and live guest code pages",
+    "nativeTargets": [
+      {
+        "guestIar": "0x8005EEC8",
+        "guestRva": "0x0001EEC8",
+        "purpose": "KeBugCheckEx"
+      }
+    ],
+    "fingerprints": [
+      {
+        "range": "0x8005F0B0-0x8005F16F",
+        "byteCount": 192,
+        "sha256": "E1321053B7D357FC2DA130D29AA1127A3641C2179594B980AC489E42159CB02B"
+      },
+      {
+        "range": "0x8005EEC8-0x8005EF07",
+        "byteCount": 64,
+        "sha256": "ABCE00C593E34AF3A22EDD4DE0F6BDA0BB3042F817F6728091AE35BE991BB009"
+      }
+    ],
+    "xeniaSemanticsReference": {
+      "repository": "https://github.com/xenia-project/xenia",
+      "commit": "95a5c3ee250f80c3b9d139658649d9ffb6db3eec",
+      "paths": [
+        "src/xenia/cpu/processor.cc",
+        "src/xenia/cpu/ppc/ppc_emit_control.cc",
+        "src/xenia/cpu/ppc/ppc_emit_memory.cc",
+        "src/xenia/cpu/ppc/ppc_emit_alu.cc"
+      ]
+    },
+    "status": "corrected-after-live-memory-and-crash-dump proof; unit validated and live installation confirmed; first mission hit pending"
+  }
+}

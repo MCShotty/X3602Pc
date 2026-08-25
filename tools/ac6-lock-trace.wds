@@ -1,0 +1,4 @@
+sxe -c ".echo BREAK" 80000003
+.reload
+bp ntdll!RtlReleaseSRWLockExclusive ".printf \"REL lock=%p state=%x ret=%p tid=%x\\n\", @rcx, poi(@rcx), poi(@rsp), @$tid; .detach; q"
+g

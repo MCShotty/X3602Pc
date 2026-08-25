@@ -1,0 +1,7 @@
+sxd e0000001
+sxd 40080201
+sxd 80000004
+sxe -c ".echo XEO3_AC6_FIRST_CHANCE_AV; .exr -1; .ecxr; r; u @rip-20 L40; kv 200; ~* kv 100; q" av
+sxe -c ".echo XEO3_AC6_FAIL_FAST; .exr -1; .ecxr; r; u @rip-20 L40; kv 200; ~* kv 100; q" c0000409
+sxe -c ".echo XEO3_AC6_FATAL_EXCEPTION; .exr -1; .ecxr; r; u @rip-20 L40; kv 200; ~* kv 100; q" e0423603
+g

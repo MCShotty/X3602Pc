@@ -1,0 +1,511 @@
+diff --git a/XenonUtils/ppc_context.h b/XenonUtils/ppc_context.h
+index 31a86cd..d2904a5 100644
+--- a/XenonUtils/ppc_context.h
++++ b/XenonUtils/ppc_context.h
+@@ -205,6 +205,237 @@ union alignas(0x10) PPCVRegister
+     double f64[2];
+ };
+ 
++inline uint64_t PPC_MULHDU(const uint64_t a, const uint64_t b) noexcept
++{
++    constexpr uint64_t mask = UINT32_MAX;
++    const uint64_t a0 = a & mask;
++    const uint64_t a1 = a >> 32;
++    const uint64_t b0 = b & mask;
++    const uint64_t b1 = b >> 32;
++
++    uint64_t t = a0 * b0;
++    const uint64_t carry = t >> 32;
++    t = a1 * b0 + carry;
++    const uint64_t middleLow = t & mask;
++    const uint64_t middleHigh = t >> 32;
++    t = a0 * b1 + middleLow;
++
++    return a1 * b1 + middleHigh + (t >> 32);
++}
++
++inline void PPC_VANDC(
++    PPCVRegister& destination,
++    const PPCVRegister& a,
++    const PPCVRegister& b) noexcept
++{
++    PPCVRegister result{};
++    result.u64[0] = a.u64[0] & ~b.u64[0];
++    result.u64[1] = a.u64[1] & ~b.u64[1];
++    destination = result;
++}
++
++inline void PPC_VSEL(
++    PPCVRegister& destination,
++    const PPCVRegister& a,
++    const PPCVRegister& b,
++    const PPCVRegister& mask) noexcept
++{
++    PPCVRegister result{};
++    result.u64[0] = (a.u64[0] & ~mask.u64[0]) | (b.u64[0] & mask.u64[0]);
++    result.u64[1] = (a.u64[1] & ~mask.u64[1]) | (b.u64[1] & mask.u64[1]);
++    destination = result;
++}
++
++inline void PPC_VCMPBFP(
++    PPCVRegister& destination,
++    const PPCVRegister& a,
++    const PPCVRegister& b,
++    PPCCRRegister* const cr6) noexcept
++{
++    PPCVRegister result{};
++    bool allWithinBounds = true;
++
++    for (size_t i = 0; i < 4; ++i)
++    {
++        uint32_t lane = 0;
++        if (std::isnan(a.f32[i]) || std::isnan(b.f32[i]))
++        {
++            lane = 0xC0000000u;
++        }
++        else
++        {
++            if (a.f32[i] > b.f32[i])
++            {
++                lane |= 0x80000000u;
++            }
++            if (a.f32[i] < -b.f32[i])
++            {
++                lane |= 0x40000000u;
++            }
++        }
++
++        result.u32[i] = lane;
++        allWithinBounds &= lane == 0;
++    }
++
++    destination = result;
++    if (cr6 != nullptr)
++    {
++        cr6->lt = 0;
++        cr6->gt = 0;
++        cr6->eq = allWithinBounds;
++        cr6->so = 0;
++    }
++}
++
++inline void PPC_VPKSWSS(
++    PPCVRegister& destination,
++    const PPCVRegister& a,
++    const PPCVRegister& b,
++    uint32_t& vscr) noexcept
++{
++    PPCVRegister result{};
++    bool saturated = false;
++
++    const auto saturate = [&saturated](const int32_t value) -> int16_t
++    {
++        if (value > INT16_MAX)
++        {
++            saturated = true;
++            return INT16_MAX;
++        }
++        if (value < INT16_MIN)
++        {
++            saturated = true;
++            return INT16_MIN;
++        }
++        return static_cast<int16_t>(value);
++    };
++
++    // XenonRecomp reverses whole vectors on load, so guest VA|VB is host VB|VA.
++    for (size_t i = 0; i < 4; ++i)
++    {
++        result.s16[i] = saturate(b.s32[i]);
++        result.s16[i + 4] = saturate(a.s32[i]);
++    }
++
++    destination = result;
++    if (saturated)
++    {
++        vscr |= 1u;
++    }
++}
++
++inline uint16_t PPC_FLOAT_TO_HALF_TRUNCATE(const float value) noexcept
++{
++    uint32_t bits;
++    std::memcpy(&bits, &value, sizeof(bits));
++
++    const uint16_t sign = static_cast<uint16_t>((bits >> 16) & 0x8000u);
++    const uint32_t exponent = (bits >> 23) & 0xFFu;
++    const uint32_t mantissa = bits & 0x7FFFFFu;
++
++    if (exponent == 0xFFu)
++    {
++        if (mantissa == 0)
++        {
++            return static_cast<uint16_t>(sign | 0x7C00u);
++        }
++
++        uint16_t payload = static_cast<uint16_t>(mantissa >> 13);
++        payload = static_cast<uint16_t>(payload | 0x0200u);
++        return static_cast<uint16_t>(sign | 0x7C00u | payload);
++    }
++
++    const int32_t unbiasedExponent = static_cast<int32_t>(exponent) - 127;
++    if (unbiasedExponent > 15)
++    {
++        return static_cast<uint16_t>(sign | 0x7BFFu);
++    }
++    if (unbiasedExponent >= -14)
++    {
++        const uint16_t halfExponent = static_cast<uint16_t>(unbiasedExponent + 15);
++        return static_cast<uint16_t>(
++            sign | (halfExponent << 10) | static_cast<uint16_t>(mantissa >> 13));
++    }
++    if (unbiasedExponent < -24 || exponent == 0)
++    {
++        return sign;
++    }
++
++    const uint32_t significand = mantissa | 0x800000u;
++    const uint32_t shift = static_cast<uint32_t>((-14 - unbiasedExponent) + 13);
++    return static_cast<uint16_t>(sign | static_cast<uint16_t>(significand >> shift));
++}
++
++inline float PPC_HALF_TO_FLOAT(const uint16_t value) noexcept
++{
++    const uint32_t sign = static_cast<uint32_t>(value & 0x8000u) << 16;
++    uint32_t exponent = (value >> 10) & 0x1Fu;
++    uint32_t mantissa = value & 0x03FFu;
++    uint32_t bits;
++
++    if (exponent == 0)
++    {
++        if (mantissa == 0)
++        {
++            bits = sign;
++        }
++        else
++        {
++            int32_t unbiasedExponent = -14;
++            while ((mantissa & 0x0400u) == 0)
++            {
++                mantissa <<= 1;
++                --unbiasedExponent;
++            }
++            mantissa &= 0x03FFu;
++            bits = sign |
++                (static_cast<uint32_t>(unbiasedExponent + 127) << 23) |
++                (mantissa << 13);
++        }
++    }
++    else if (exponent == 0x1Fu)
++    {
++        bits = sign | 0x7F800000u | (mantissa << 13);
++    }
++    else
++    {
++        exponent = exponent - 15 + 127;
++        bits = sign | (exponent << 23) | (mantissa << 13);
++    }
++
++    float result;
++    std::memcpy(&result, &bits, sizeof(result));
++    return result;
++}
++
++inline void PPC_VPKD3D_FLOAT16_2(
++    PPCVRegister& destination,
++    const PPCVRegister& source,
++    const uint32_t shift) noexcept
++{
++    PPCVRegister result = destination;
++    const PPCVRegister input = source;
++    result.u32[shift] =
++        (static_cast<uint32_t>(PPC_FLOAT_TO_HALF_TRUNCATE(input.f32[3])) << 16) |
++        PPC_FLOAT_TO_HALF_TRUNCATE(input.f32[2]);
++    destination = result;
++}
++
++inline void PPC_VUPKD3D_FLOAT16_4(
++    PPCVRegister& destination,
++    const PPCVRegister& source) noexcept
++{
++    const PPCVRegister input = source;
++    PPCVRegister result{};
++    for (size_t i = 0; i < 4; ++i)
++    {
++        result.f32[i] = PPC_HALF_TO_FLOAT(input.u16[i + 4]);
++    }
++    destination = result;
++}
++
+ #define PPC_ROUND_NEAREST 0x00
+ #define PPC_ROUND_TOWARD_ZERO 0x01
+ #define PPC_ROUND_UP 0x02
+@@ -370,6 +601,7 @@ struct alignas(0x40) PPCContext
+     PPCCRRegister cr7;
+ #endif
+     PPCFPSCRRegister fpscr;
++    uint32_t vscr{};
+ 
+ #ifndef PPC_CONFIG_NON_ARGUMENT_AS_LOCAL
+     PPCRegister f0;
+diff --git a/XenonAnalyse/tests/ppc_semantics_tests.cpp b/XenonAnalyse/tests/ppc_semantics_tests.cpp
+new file mode 100644
+index 0000000..67c1847
+--- /dev/null
++++ b/XenonAnalyse/tests/ppc_semantics_tests.cpp
+@@ -0,0 +1,255 @@
++#define PPC_CONFIG_H_INCLUDED
++#define PPC_IMAGE_BASE 0x82000000u
++#define PPC_IMAGE_SIZE 0x00AA0000u
++#define PPC_CODE_BASE 0x82000000u
++
++#include <ppc_context.h>
++
++#include <cmath>
++#include <cstdint>
++#include <iostream>
++#include <limits>
++
++namespace
++{
++bool Check(const bool condition, const char* const message)
++{
++    if (!condition)
++    {
++        std::cerr << message << '\n';
++    }
++    return condition;
++}
++
++uint64_t ReferenceMulHigh(const uint64_t a, const uint64_t b)
++{
++#if defined(__SIZEOF_INT128__)
++    return static_cast<uint64_t>(
++        (static_cast<unsigned __int128>(a) * static_cast<unsigned __int128>(b)) >> 64);
++#else
++    return PPC_MULHDU(a, b);
++#endif
++}
++
++bool TestMulHigh()
++{
++    constexpr uint64_t values[] = {
++        0,
++        1,
++        UINT32_MAX,
++        UINT64_C(0x100000000),
++        UINT64_C(0x0123456789ABCDEF),
++        UINT64_C(0xFEDCBA9876543210),
++        UINT64_MAX,
++    };
++
++    for (const uint64_t a : values)
++    {
++        for (const uint64_t b : values)
++        {
++            if (!Check(PPC_MULHDU(a, b) == ReferenceMulHigh(a, b), "mulhdu mismatch"))
++            {
++                return false;
++            }
++        }
++    }
++    return true;
++}
++
++bool TestVectorLogic()
++{
++    PPCVRegister a{};
++    PPCVRegister b{};
++    PPCVRegister mask{};
++    a.u64[0] = UINT64_C(0xFFFF0000AAAA5555);
++    a.u64[1] = UINT64_C(0x123456789ABCDEF0);
++    b.u64[0] = UINT64_C(0x0F0F0F0F33333333);
++    b.u64[1] = UINT64_C(0xFFFFFFFF00000000);
++    mask.u64[0] = UINT64_C(0x00FF00FFFF0000FF);
++    mask.u64[1] = UINT64_C(0xAAAAAAAA55555555);
++
++    PPCVRegister destination = a;
++    PPC_VANDC(destination, destination, b);
++    if (!Check(destination.u64[0] == (a.u64[0] & ~b.u64[0]) &&
++                   destination.u64[1] == (a.u64[1] & ~b.u64[1]),
++               "vandc mismatch or alias failure"))
++    {
++        return false;
++    }
++
++    destination = mask;
++    PPC_VSEL(destination, a, b, destination);
++    return Check(
++        destination.u64[0] == ((a.u64[0] & ~mask.u64[0]) | (b.u64[0] & mask.u64[0])) &&
++            destination.u64[1] == ((a.u64[1] & ~mask.u64[1]) | (b.u64[1] & mask.u64[1])),
++        "vsel mismatch or mask alias failure");
++}
++
++bool TestCompareBounds()
++{
++    PPCVRegister a{};
++    PPCVRegister b{};
++    a.f32[0] = 0.5f;
++    a.f32[1] = 3.0f;
++    a.f32[2] = -3.0f;
++    a.f32[3] = std::numeric_limits<float>::quiet_NaN();
++    b.f32[0] = 1.0f;
++    b.f32[1] = 2.0f;
++    b.f32[2] = 2.0f;
++    b.f32[3] = 1.0f;
++
++    PPCCRRegister cr6{1, 1, 1, {1}};
++    PPCVRegister destination = a;
++    PPC_VCMPBFP(destination, destination, b, &cr6);
++    if (!Check(
++            destination.u32[0] == 0 &&
++                destination.u32[1] == 0x80000000u &&
++                destination.u32[2] == 0x40000000u &&
++                destination.u32[3] == 0xC0000000u,
++            "vcmpbfp lane result mismatch"))
++    {
++        return false;
++    }
++    if (!Check(cr6.lt == 0 && cr6.gt == 0 && cr6.eq == 0 && cr6.so == 0,
++               "vcmpbfp record result mismatch"))
++    {
++        return false;
++    }
++
++    a.f32[0] = -1.0f;
++    a.f32[1] = 0.0f;
++    a.f32[2] = 1.0f;
++    a.f32[3] = 2.0f;
++    b.f32[0] = 1.0f;
++    b.f32[1] = 1.0f;
++    b.f32[2] = 1.0f;
++    b.f32[3] = 2.0f;
++    PPC_VCMPBFP(destination, a, b, &cr6);
++    return Check(cr6.lt == 0 && cr6.gt == 0 && cr6.eq == 1 && cr6.so == 0,
++                 "vcmpbfp all-within-bounds CR6 mismatch");
++}
++
++bool TestPackSignedWord()
++{
++    PPCVRegister a{};
++    PPCVRegister b{};
++    a.s32[0] = INT16_MIN;
++    a.s32[1] = -1;
++    a.s32[2] = 0;
++    a.s32[3] = INT16_MAX;
++    b.s32[0] = INT32_MIN;
++    b.s32[1] = INT16_MIN - 1;
++    b.s32[2] = INT16_MAX + 1;
++    b.s32[3] = INT32_MAX;
++
++    uint32_t vscr = 0x10;
++    PPCVRegister destination = a;
++    PPC_VPKSWSS(destination, destination, b, vscr);
++    constexpr int16_t expected[] = {
++        INT16_MIN,
++        INT16_MIN,
++        INT16_MAX,
++        INT16_MAX,
++        INT16_MIN,
++        -1,
++        0,
++        INT16_MAX,
++    };
++    for (size_t i = 0; i < 8; ++i)
++    {
++        if (!Check(destination.s16[i] == expected[i], "vpkswss lane or alias mismatch"))
++        {
++            return false;
++        }
++    }
++    if (!Check(vscr == 0x11, "vpkswss did not set sticky VSCR SAT"))
++    {
++        return false;
++    }
++
++    a = {};
++    b = {};
++    vscr = 0x40;
++    PPC_VPKSWSS(destination, a, b, vscr);
++    return Check(vscr == 0x40, "vpkswss changed VSCR without saturation");
++}
++
++bool TestScalarSemantics()
++{
++    const uint16_t guestValue = 0x1234;
++    if (!Check(__builtin_bswap16(guestValue) == 0x3412, "lhbrx byte reversal mismatch"))
++    {
++        return false;
++    }
++
++    const double result = 1.0 / std::sqrt(16.0);
++    return Check(result == 0.25, "frsqrte reciprocal square root mismatch");
++}
++
++bool TestD3DPack()
++{
++    if (!Check(
++            PPC_FLOAT_TO_HALF_TRUNCATE(1.0f) == 0x3C00u &&
++                PPC_FLOAT_TO_HALF_TRUNCATE(-2.0f) == 0xC000u &&
++                PPC_FLOAT_TO_HALF_TRUNCATE(65520.0f) == 0x7BFFu &&
++                PPC_FLOAT_TO_HALF_TRUNCATE(std::numeric_limits<float>::infinity()) == 0x7C00u,
++            "float-to-half conversion mismatch"))
++    {
++        return false;
++    }
++    if (!Check(
++            PPC_HALF_TO_FLOAT(0x3C00u) == 1.0f &&
++                PPC_HALF_TO_FLOAT(0xC000u) == -2.0f &&
++                PPC_HALF_TO_FLOAT(0x0001u) == std::ldexp(1.0f, -24),
++            "half-to-float conversion mismatch"))
++    {
++        return false;
++    }
++
++    PPCVRegister source{};
++    source.f32[0] = 4.0f;
++    source.f32[1] = 3.0f;
++    source.f32[2] = 2.0f;
++    source.f32[3] = 1.0f;
++    PPCVRegister packed{};
++    packed.u32[0] = 0x11111111u;
++    packed.u32[1] = 0x22222222u;
++    packed.u32[2] = 0x33333333u;
++    packed.u32[3] = 0x44444444u;
++    PPC_VPKD3D_FLOAT16_2(packed, source, 3);
++    if (!Check(
++            packed.u32[0] == 0x11111111u &&
++                packed.u32[1] == 0x22222222u &&
++                packed.u32[2] == 0x33333333u &&
++                packed.u32[3] == 0x3C004000u,
++            "vpkd3d float16_2 lane placement mismatch"))
++    {
++        return false;
++    }
++
++    packed.u16[4] = PPC_FLOAT_TO_HALF_TRUNCATE(4.0f);
++    packed.u16[5] = PPC_FLOAT_TO_HALF_TRUNCATE(3.0f);
++    packed.u16[6] = PPC_FLOAT_TO_HALF_TRUNCATE(2.0f);
++    packed.u16[7] = PPC_FLOAT_TO_HALF_TRUNCATE(1.0f);
++    PPCVRegister unpacked = packed;
++    PPC_VUPKD3D_FLOAT16_4(unpacked, unpacked);
++    return Check(
++        unpacked.f32[0] == 4.0f &&
++            unpacked.f32[1] == 3.0f &&
++            unpacked.f32[2] == 2.0f &&
++            unpacked.f32[3] == 1.0f,
++        "vupkd3d float16_4 conversion or alias mismatch");
++}
++}
++
++int main()
++{
++    return TestMulHigh() &&
++                   TestVectorLogic() &&
++                   TestCompareBounds() &&
++                   TestPackSignedWord() &&
++                   TestScalarSemantics() &&
++                   TestD3DPack()
++               ? 0
++               : 1;
++}

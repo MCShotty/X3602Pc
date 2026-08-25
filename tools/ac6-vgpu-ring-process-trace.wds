@@ -1,0 +1,25 @@
+sxd e0000001
+sxd 40080201
+sxd 80000004
+sxe e0423603
+sxd c0000005
+sxd c000001d
+sxd c0000094
+sxe c0000409
+bu VGPUDX12+0x5bfe ".if (dwo(@rcx+0xa60) == 0x2000) { .if (dwo(poi(@rcx+0xa0)+0x2774) != 0) { .echo XEO3_AC6_VGPU_RING_PROCESS_HIT } .else { gc } } .else { gc }"
+g
+.echo XEO3_AC6_VGPU_RING_PROCESS_STOPPED
+bc *
+r @$t0=@rcx
+r @$t1=poi(@$t0+0xa0)
+r @$t2=poi(VGPUDX12+0x5abcb0)
+r @$t3=@$t2+(dwo(@$t0+0xa64)&0x1fffffff)
+.printf "XEO3_AC6_VGPU_PROCESS_BEFORE state=%p registers=%p memory=%p ring=%p size=%x base=%x rptr=%x wptr=%x bytes=%x\n", @$t0, @$t1, @$t2, @$t3, dwo(@$t0+0xa60), dwo(@$t0+0xa64), dwo(@$t0+0xa74), dwo(@$t1+0x2774), dwo(@$t0+0x18)
+dd @$t3 L40
+p
+.echo XEO3_AC6_VGPU_RING_PROCESS_RETURNED
+.printf "XEO3_AC6_VGPU_PROCESS_AFTER rptr=%x reg_rptr=%x wptr=%x bytes=%x remaining=%x pointer=%p\n", dwo(@$t0+0xa74), dwo(@$t1+0x2770), dwo(@$t1+0x2774), dwo(@$t0+0x18), dwo(@$t0+0x1c), poi(@$t0+0x20)
+dd @$t3 L40
+kv 100
+.echo XEO3_AC6_VGPU_RING_PROCESS_DUMP_DONE
+q

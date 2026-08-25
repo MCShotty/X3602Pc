@@ -1,0 +1,15 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+.echo XEO3_AC6_HOST_FILE_HANDLE_BEGIN
+!handle 1460 f
+!handle 147c f
+!handle e50 f
+!handle ea0 f
+.echo XEO3_AC6_HOST_FILE_HANDLE_DONE
+.detach
+q

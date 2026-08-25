@@ -1,0 +1,33 @@
+sxd e0000001
+sxd 40080201
+sxd 80000004
+sxe e0423603
+sxd c0000005
+sxd c000001d
+sxd c0000094
+sxe c0000409
+bu Emu+0x636c9 ".if (@edx == 0x714) { .echo XEO3_AC6_VGPU_RING_STATE_HIT } .else { gc }"
+g
+.echo XEO3_AC6_VGPU_RING_STATE_STOPPED
+bc *
+r @$t0=poi(@rcx+0x10)
+r @$t1=poi(@$t0+8)
+r @$t2=poi(@$t1+0x24ae0)
+r @$t3=poi(@$t1+0x24ae8)
+r @$t4=poi(@$t3+0x10)
+r @$t5=poi(@$t4+0xa0)
+r @$t6=poi(@$t3+8)
+.printf "XEO3_AC6_VGPU_LINKS object=%p gpu=%p callback=%p context=%p ring_state=%p registers=%p queue=%p\n", @rcx, @$t1, @$t2, @$t3, @$t4, @$t5, @$t6
+.printf "XEO3_AC6_VGPU_CONFIG_BEFORE dirty=%x size=%x base=%x swap=%x intr=%x rptr_addr=%x rptr_swap=%x threshold=%x\n", by(@$t4+0xa6a), dwo(@$t4+0xa60), dwo(@$t4+0xa64), by(@$t4+0xa68), by(@$t4+0xa69), dwo(@$t4+0xa6c), dwo(@$t4+0xa70), dwo(@$t4+0xa7c)
+.printf "XEO3_AC6_VGPU_REGISTERS_BEFORE rb_base=%x rb_cntl=%x rb_rptr=%x rb_rptr_addr=%x rb_wptr_delay=%x rb_wptr=%x\n", dwo(@$t5+0x2760), dwo(@$t5+0x2764), dwo(@$t5+0x2768), dwo(@$t5+0x276c), dwo(@$t5+0x2770), dwo(@$t5+0x2774)
+.printf "XEO3_AC6_VGPU_QUEUE_BEFORE read=%x write=%x count=%x event=%p\n", dwo(@$t6+0x30), dwo(@$t6+0x34), dwo(@$t3+0x48), poi(@$t6+0x58)
+dd @$t6+0x30 L10
+p
+.echo XEO3_AC6_VGPU_RING_STATE_AFTER_CALL
+.printf "XEO3_AC6_VGPU_CONFIG_AFTER dirty=%x size=%x base=%x swap=%x intr=%x rptr_addr=%x rptr_swap=%x threshold=%x\n", by(@$t4+0xa6a), dwo(@$t4+0xa60), dwo(@$t4+0xa64), by(@$t4+0xa68), by(@$t4+0xa69), dwo(@$t4+0xa6c), dwo(@$t4+0xa70), dwo(@$t4+0xa7c)
+.printf "XEO3_AC6_VGPU_REGISTERS_AFTER rb_base=%x rb_cntl=%x rb_rptr=%x rb_rptr_addr=%x rb_wptr_delay=%x rb_wptr=%x\n", dwo(@$t5+0x2760), dwo(@$t5+0x2764), dwo(@$t5+0x2768), dwo(@$t5+0x276c), dwo(@$t5+0x2770), dwo(@$t5+0x2774)
+.printf "XEO3_AC6_VGPU_QUEUE_AFTER read=%x write=%x count=%x event=%p\n", dwo(@$t6+0x30), dwo(@$t6+0x34), dwo(@$t3+0x48), poi(@$t6+0x58)
+dd @$t6+0x30 L10
+kv 100
+.echo XEO3_AC6_VGPU_RING_STATE_DUMP_DONE
+q

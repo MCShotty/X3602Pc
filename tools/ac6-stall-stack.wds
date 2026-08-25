@@ -1,0 +1,12 @@
+sx -c
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo XEO3_AC6_STALL_STACK_BEGIN
+.printf "bridge_last_iar=%08x queue_wait_object=%08x queue_wait_count=%08x dispatch=%I64u worker_loop=%I64u callbacks=%I64u returns=%I64u\n", dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeLastGuestIar), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeLastQueueWaitObject), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeLastQueueWaitCount), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeDispatchCount), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeWorkerLoopCount), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeWorkerCallbackDispatchCount), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeWorkerCallbackReturnCount)
+~6 kv 80
+~2 kv 80
+~7 kv 80
+~21 kv 80
+~28 kv 40
+.echo XEO3_AC6_STALL_STACK_END
+.detach
+q

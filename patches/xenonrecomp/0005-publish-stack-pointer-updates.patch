@@ -1,0 +1,98 @@
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index 7296af5..89fa08f 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -10,6 +10,59 @@ static uint64_t ComputeMask(uint32_t mstart, uint32_t mstop)
+     return mstart <= mstop ? value : ~value;
+ }
+ 
++static bool GeneratedCodeWritesStackPointer(const std::string_view generatedCode)
++{
++    constexpr std::string_view stackPointerPrefix = "ctx.r1.";
++    size_t lineStart = 0;
++
++    while (lineStart < generatedCode.size())
++    {
++        const auto lineEnd = generatedCode.find('\n', lineStart);
++        auto line = generatedCode.substr(
++            lineStart,
++            lineEnd == std::string_view::npos
++                ? generatedCode.size() - lineStart
++                : lineEnd - lineStart);
++        const auto contentStart = line.find_first_not_of(" \t");
++        if (contentStart != std::string_view::npos)
++        {
++            line.remove_prefix(contentStart);
++            if (line.compare(
++                    0,
++                    stackPointerPrefix.size(),
++                    stackPointerPrefix) == 0)
++            {
++                const auto assignment = line.find('=');
++                if (assignment != std::string_view::npos)
++                {
++                    const auto previous =
++                        assignment == 0 ? '\0' : line[assignment - 1];
++                    const auto next =
++                        assignment + 1 >= line.size()
++                            ? '\0'
++                            : line[assignment + 1];
++                    if (next != '=' &&
++                        previous != '=' &&
++                        previous != '!' &&
++                        previous != '<' &&
++                        previous != '>')
++                    {
++                        return true;
++                    }
++                }
++            }
++        }
++
++        if (lineEnd == std::string_view::npos)
++        {
++            break;
++        }
++        lineStart = lineEnd + 1;
++    }
++
++    return false;
++}
++
+ bool Recompiler::LoadConfig(const std::string_view& configFilePath)
+ {
+     config.Load(configFilePath);
+@@ -726,6 +779,7 @@ bool Recompiler::Recompile(
+     if (midAsmHook != config.midAsmHooks.end() && !midAsmHook->second.afterInstruction)
+         printMidAsmHook();
+ 
++    const auto instructionOutputStart = out.size();
+     int id = insn.opcode->id;
+ 
+     // Handling instructions that don't disassemble correctly for some reason here
+@@ -2547,6 +2601,12 @@ bool Recompiler::Recompile(
+     }
+ #endif
+ 
++    if (GeneratedCodeWritesStackPointer(
++            std::string_view(out).substr(instructionOutputStart)))
++    {
++        println("\tPPC_PUBLISH_STACK_POINTER();");
++    }
++
+     if (midAsmHook != config.midAsmHooks.end() && midAsmHook->second.afterInstruction)
+         printMidAsmHook();
+     
+diff --git a/XenonUtils/ppc_context.h b/XenonUtils/ppc_context.h
+index 0bce94e..83c1757 100644
+--- a/XenonUtils/ppc_context.h
++++ b/XenonUtils/ppc_context.h
+@@ -936,4 +936,8 @@ inline uint64_t __rdtsc()
+ #define PPC_READ_TIME_BASE() __rdtsc()
+ #endif
+ 
++#ifndef PPC_PUBLISH_STACK_POINTER
++#define PPC_PUBLISH_STACK_POINTER() ((void)0)
++#endif
++
+ #endif

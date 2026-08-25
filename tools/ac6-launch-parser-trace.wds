@@ -1,0 +1,5 @@
+sxd e0000001
+sxd 40080201
+bp Emu+0x43900 "r @$t0=@rdx; .printf \"PARSE_ENTER mode=%x\n\", @$t0; gu; .printf \"PARSE_RETURN mode=%x result=%x\n\", @$t0, @eax; g"
+bp Emu+0x3cd10 ".echo FILE_PARSE_ENTER; gu; .printf \"FILE_PARSE_RETURN result=%x\n\", @eax; g"
+g

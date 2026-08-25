@@ -1,0 +1,13 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f D3D12Core.dll
+x D3D12Core!D3D12DeviceRemovedExtendedData
+x d3d12!D3D12DeviceRemovedExtendedData
+q

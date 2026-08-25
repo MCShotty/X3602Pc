@@ -1,0 +1,23 @@
+sxd e0000001
+sxd 40080201
+sxd 80000003
+sxd 80000004
+sxd c0000005
+sxd c000001d
+sxd c0000094
+sxe c0000409
+sxe e0423603
+bu VGPUDX12+0x19334 ".printf \"XEO3_AC6_PIPELINE_CREATE_RESULT hr=%08x output=%p shader_kind=%x arg5=%p object=%p device=%p\n\", @eax, poi(@rbp-0x40), @esi, @r14, @rbx, poi(@rbx+8); gc"
+g
+.echo XEO3_AC6_VGPU_PIPELINE_FAILURE
+.lastevent
+.exr -1
+.ecxr
+r
+u @rip-40 L80
+kv 200
+.dump /ma C:\Users\CaptainMcShotgun\Documents\x3602Pc\out\ac6\Emu-18738-vgpu-pipeline-null.dmp
+~* kv 100
+lm
+.echo XEO3_AC6_VGPU_PIPELINE_DUMP_DONE
+q

@@ -1,0 +1,14 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f d3d12.dll
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.scriptload C:\Users\CaptainMcShotgun\Documents\x3602Pc\.tools\DirectX-Debugging-Tools\D3DDred-WinDbg\D3DDred.js
+ba e1 VGPUDX12+0x5a62e ".echo XEO3_AC6_DEVICE_REMOVED_REASON; .printf \"reason=%08x tid=%x\n\", @eax, @$tid; !d3ddred; .echo XEO3_AC6_DRED_DONE; q"
+g

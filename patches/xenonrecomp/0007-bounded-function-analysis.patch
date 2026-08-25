@@ -1,0 +1,160 @@
+diff --git a/XenonAnalyse/function.cpp b/XenonAnalyse/function.cpp
+index 4a669d6..b9191be 100644
+--- a/XenonAnalyse/function.cpp
++++ b/XenonAnalyse/function.cpp
+@@ -46,7 +46,8 @@ Function Function::Analyze(
+ {
+     Function fn{ base, 0 };
+ 
+-    if (*((uint32_t*)code + 1) == 0x04000048) // shifted ptr tail call
++    if (size >= 8 &&
++        *((uint32_t*)code + 1) == 0x04000048) // shifted ptr tail call
+     {
+         fn.size = 0x8;
+         return fn;
+@@ -66,7 +67,7 @@ Function Function::Analyze(
+     #define RESTORE_DATA() if (!blockStack.empty()) data = (dataStart + ((blocks[blockStack.back()].base + blocks[blockStack.back()].size) / sizeof(*data))) - 1; // continue adds one
+ 
+     // TODO: Branch fallthrough
+-    for (; data <= dataEnd ; ++data)
++    for (; data < dataEnd ; ++data)
+     {
+         const size_t addr = base + ((data - dataStart) * sizeof(*data));
+         if (blockStack.empty())
+@@ -110,33 +111,39 @@ Function Function::Analyze(
+             assert(!PPC_BA(instruction));
+             const size_t branchDest = addr + PPC_BD(instruction);
+ 
+-            // true/false paths
+-            // left block: false case
+-            // right block: true case
+             const size_t lBase = (addr - base) + 4;
+-            const size_t rBase = (addr + PPC_BD(instruction)) - base;
+-
+-            // these will be -1 if it's our first time seeing these blocks
+-            auto lBlock = fn.SearchBlock(base + lBase);
+-
+-            if (lBlock == -1)
++            if (lBase < size)
+             {
+-                blocks.emplace_back(lBase, 0).projectedSize = rBase - lBase;
+-                lBlock = blocks.size() - 1;
++                auto lBlock = fn.SearchBlock(base + lBase);
++                if (lBlock == -1)
++                {
++                    blocks.emplace_back(lBase, 0);
++                    lBlock = blocks.size() - 1;
++
++                    if (branchDest > base + lBase &&
++                        branchDest < base + size)
++                    {
++                        blocks[lBlock].projectedSize =
++                            branchDest - (base + lBase);
++                    }
+ 
+-                // push this first, this gets overriden by the true case as it'd be further away
+-                DEBUG(blocks[lBlock].parent = blockBase);
+-                blockStack.emplace_back(lBlock);
++                    // Push fallthrough first so an in-range taken edge wins.
++                    DEBUG(blocks[lBlock].parent = blockBase);
++                    blockStack.emplace_back(lBlock);
++                }
+             }
+ 
+-            size_t rBlock = fn.SearchBlock(base + rBase);
+-            if (rBlock == -1)
++            if (branchDest >= base && branchDest < base + size)
+             {
+-                blocks.emplace_back(branchDest - base, 0);
+-                rBlock = blocks.size() - 1;
++                auto rBlock = fn.SearchBlock(branchDest);
++                if (rBlock == -1)
++                {
++                    blocks.emplace_back(branchDest - base, 0);
++                    rBlock = blocks.size() - 1;
+ 
+-                DEBUG(blocks[rBlock].parent = blockBase);
+-                blockStack.emplace_back(rBlock);
++                    DEBUG(blocks[rBlock].parent = blockBase);
++                    blockStack.emplace_back(rBlock);
++                }
+             }
+ 
+             RESTORE_DATA();
+@@ -152,16 +159,16 @@ Function Function::Analyze(
+                     assert(!PPC_BA(instruction));
+                     const size_t branchDest = addr + PPC_BI(instruction);
+ 
+-                    const size_t branchBase = branchDest - base;
+-                    const size_t branchBlock = fn.SearchBlock(branchDest);
+-
+-                    if (branchDest < base)
++                    if (branchDest < base || branchDest >= base + size)
+                     {
+-                        // Branches before base are just tail calls, no need to chase after those
++                        // Out-of-range branches are tail transfers.
+                         RESTORE_DATA();
+                         continue;
+                     }
+ 
++                    const size_t branchBase = branchDest - base;
++                    const size_t branchBlock = fn.SearchBlock(branchDest);
++
+                     // carry over our projection if blocks are next to each other
+                     const bool isContinuous = branchBase == curBlock.base + curBlock.size;
+                     size_t sizeProjection = (size_t)-1;
+diff --git a/XenonAnalyse/tests/function_tests.cpp b/XenonAnalyse/tests/function_tests.cpp
+index 18e1b68..a16dccb 100644
+--- a/XenonAnalyse/tests/function_tests.cpp
++++ b/XenonAnalyse/tests/function_tests.cpp
+@@ -61,5 +61,50 @@ int main()
+         return 1;
+     }
+ 
++    const std::array<std::uint32_t, 2> backwardConditional = {
++        ByteSwap(0x4182FFFCu), // beq base - 4
++        ByteSwap(0x4E800020u), // blr
++    };
++    const auto boundedBackward = Function::Analyze(
++        backwardConditional.data(),
++        sizeof(backwardConditional),
++        base);
++    if (!Check(
++            boundedBackward.size == sizeof(backwardConditional),
++            "out-of-range backward conditional branch escaped the buffer"))
++    {
++        return 1;
++    }
++
++    const std::array<std::uint32_t, 2> forwardConditional = {
++        ByteSwap(0x41820010u), // beq base + 0x10
++        ByteSwap(0x4E800020u), // blr
++    };
++    const auto boundedForward = Function::Analyze(
++        forwardConditional.data(),
++        sizeof(forwardConditional),
++        base);
++    if (!Check(
++            boundedForward.size == sizeof(forwardConditional),
++            "out-of-range forward conditional branch escaped the buffer"))
++    {
++        return 1;
++    }
++
++    const std::array<std::uint32_t, 2> forwardTail = {
++        ByteSwap(0x48000010u), // b base + 0x10
++        ByteSwap(0x4E800020u), // unreachable
++    };
++    const auto boundedTail = Function::Analyze(
++        forwardTail.data(),
++        sizeof(forwardTail),
++        base);
++    if (!Check(
++            boundedTail.size == sizeof(std::uint32_t),
++            "out-of-range direct branch was not treated as a tail transfer"))
++    {
++        return 1;
++    }
++
+     return 0;
+ }

@@ -1,0 +1,8 @@
+sxd e0000001
+sxd 40080201
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo XEO3_AC6_NATIVE_IMPORT_SLOT_TRACE_ARMED
+bp xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!XeO3CallMappedGuest ".echo XEO3_AC6_NATIVE_IMPORT_SLOT; .printf \"cpu_state=%p guest_memory=%p target_iar=%08x dispatch_base=%p slot=%p native_target=%p state_iar=%08x return_address=%p stack=%p\n\", @rcx, @rdx, @r8d, poi(@rcx-0x10), poi(@rcx-0x10)+(@r8*2), poi(poi(@rcx-0x10)+(@r8*2)), dwo(@rcx-8), poi(@rsp), @rsp; dq @rcx-0x20 L8; dq poi(@rcx-0x10)+(@r8*2) L4; ln poi(poi(@rcx-0x10)+(@r8*2)); u poi(poi(@rcx-0x10)+(@r8*2))-20 L80; kv 40; q"
+g

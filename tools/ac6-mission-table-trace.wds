@@ -1,0 +1,21 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED_FOR_MISSION_TABLE_TRACE
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_8237C770+0x2350 ".if (dwo(@rdi+0x58) > 0x10000) { .echo XEO3_AC6_INVALID_MISSION_TABLE_ENTRY; .printf \"ctx=%p guest_base=%p object=%08x index=%08x array=%08x base_holder=%08x base_value=%08x offset=%08x count=%08x computed=%08x field_address=%08x\n\", @rdi, @rsi, dwo(@rdi+0xf8), dwo(@rsi+dwo(@rdi+0xf8)+0xdc), dwo(@rsi+dwo(@rdi+0xf8)+0x28), dwo(@rsi+dwo(@rdi+0xf8)+0x20), dwo(@rsi+dwo(@rsi+dwo(@rdi+0xf8)+0x20)), dwo(@rsi+dwo(@rsi+dwo(@rdi+0xf8)+0x28)+8*dwo(@rsi+dwo(@rdi+0xf8)+0xdc)), dwo(@rdi+0x58), @r9d, @r8d; .echo XEO3_AC6_TRANSLATED_CONTEXT; dq @rdi L80; .echo XEO3_AC6_SCENE_OBJECT; dd (@rsi+dwo(@rdi+0xf8)) L80; .echo XEO3_AC6_TABLE_WINDOW; dd (@rsi+dwo(@rsi+dwo(@rdi+0xf8)+0x28)+8*dwo(@rsi+dwo(@rdi+0xf8)+0xdc)-0x40) L40; .echo XEO3_AC6_BASE_HOLDER; dd (@rsi+dwo(@rsi+dwo(@rdi+0xf8)+0x20)-0x20) L40; kv 100; .echo XEO3_AC6_INVALID_MISSION_TABLE_ENTRY_TRACE_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_MISSION_TABLE_TRACE_FALLBACK
+.lastevent
+.exr -1
+r
+kv 100
+q

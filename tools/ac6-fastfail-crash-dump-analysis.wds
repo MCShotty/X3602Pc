@@ -1,0 +1,25 @@
+.ecxr
+.echo ===FASTFAIL_EVENT===
+.lastevent
+.exr -1
+r
+.echo ===FAULT_CODE===
+u @rip-40 L80
+.echo ===FAULT_STACK===
+kv 160
+.echo ===FAULT_STACK_MEMORY===
+dps @rsp L100
+.echo ===FATAL_MESSAGE_CANDIDATES===
+da @rsp+0x40
+da @rsp+0x50
+da @rsp+0x60
+du @rsp+0x40
+du @rsp+0x50
+du @rsp+0x60
+.echo ===ALL_THREADS===
+~* kv 50
+.echo ===MODULES===
+lm m Emu
+lm m xeo3*
+lm m VGPUDX12
+q

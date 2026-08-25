@@ -1,0 +1,11 @@
+sx -c
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo XEO3_AC6_WORKER_SLOT2_SNAPSHOT_BEGIN
+.printf "slot2_target=%08x object=%08x payload=%I64x host_tid=%08x\n", dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeWorkerPrimarySlot2Target), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeWorkerPrimarySlot2Object), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeWorkerPrimarySlot2Payload), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeWorkerPrimarySlot2ThreadId)
+~~[7df8]s
+r
+kv 100
+dps @rsp L100
+.echo XEO3_AC6_WORKER_SLOT2_SNAPSHOT_END
+.detach
+q

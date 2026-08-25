@@ -1,0 +1,6 @@
+.echo XEO3_AC6_PENDING_READ_BUFFER
+.printf "status=%08x information=%08x offset_low=%08x offset_high=%08x event=%08x\n", dwo(00000001826a729c), dwo(00000001826a72a0), dwo(00000001826a72a4), dwo(00000001826a72a8), dwo(00000001826a72ac)
+db 00000001ad890000 L40
+.echo XEO3_AC6_PENDING_READ_BUFFER_DONE
+.detach
+q

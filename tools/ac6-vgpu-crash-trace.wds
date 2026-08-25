@@ -1,0 +1,24 @@
+sxd e0000001
+sxd 40080201
+sxd 80000003
+sxd 80000004
+sxe c0000005
+sxe c000001d
+sxe c0000096
+sxe c0000409
+sxe e0423603
+.echo XEO3_AC6_VGPU_EXCEPTION_TRACE_READY
+g
+.echo XEO3_AC6_VGPU_EXCEPTION
+.lastevent
+.exr -1
+.ecxr
+r
+u @rip-40 L80
+kv 200
+dps @rsp L100
+lm m Emu
+lm m xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6
+lm m VGPUDX12
+.echo XEO3_AC6_VGPU_EXCEPTION_DONE
+q

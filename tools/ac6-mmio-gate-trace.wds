@@ -1,0 +1,38 @@
+sxd e0000001
+sxd 40080201
+sxd 80000004
+sxe e0423603
+sxd c0000005
+sxd c000001d
+sxd c0000094
+sxe c0000409
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!xeo3::MmioStore32 ".if (@r8d == 0x7fc80714) { .if (@r9d == 0x1f) { .echo XEO3_AC6_MMIO_GATE_HIT } .else { gc } } .else { gc }"
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no!xeo3::MmioStore32 ".if (@r8d == 0x7fc80714) { .if (@r9d == 0x1f) { .echo XEO3_AC6_MMIO_GATE_HIT_NO } .else { gc } } .else { gc }"
+g
+.echo XEO3_AC6_MMIO_GATE_STOPPED
+r @$t0=@rcx
+r @$t1=@rdx
+r @$t2=poi(@$t0+0xf8)
+r @$t3=(by(@$t1+@$t2+0x2a90)<<0x18)|(by(@$t1+@$t2+0x2a91)<<0x10)|(by(@$t1+@$t2+0x2a92)<<8)|by(@$t1+@$t2+0x2a93)
+r @$t4=poi(@$t0+0xd0)
+r @$t5=poi(@$t0+0xd8)
+.printf "XEO3_AC6_RING_CONTEXT ppc=%p base=%p state=%08x rptr_address=%08x ring=%08x mask=%08x\n", @$t0, @$t1, @$t2, @$t3, @$t4, @$t5
+r
+kv 100
+.echo XEO3_AC6_RING_STATE_BEFORE
+dd @$t1+@$t2+0x2a80 L20
+dd @$t1+@$t3 L10
+dd @$t1+@$t4 L40
+.echo XEO3_AC6_MMIO_GATE_RESUMING
+g
+.echo XEO3_AC6_POST_GATE_BREAK
+r
+kv 200
+.echo XEO3_AC6_RING_STATE_AFTER
+dd @$t1+@$t2+0x2a80 L20
+dd @$t1+@$t3 L10
+dd @$t1+@$t4 L40
+~* kv 100
+dv /t
+.echo XEO3_AC6_POST_GATE_DUMP_DONE
+q

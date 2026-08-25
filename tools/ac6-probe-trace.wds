@@ -1,0 +1,15 @@
+sxd e0000001
+sxd 40080201
+sxe -c ".echo FIRST_CHANCE_AV; .exr -1; .ecxr; r; u @rip-10 L24; kvn; dps @rsp L20; q" av
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo PROBE_MODULE_LOADED
+lmvm xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6
+bp xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!InitPrecompiledDll ".printf \"INIT_ENTER mappings=%p count=%p host=%p options=%p requested=%x\n\", @rcx, @rdx, @r8, @r9, dwo(@r9+4); r @$t0=@rcx; r @$t1=@rdx; r @$t2=@r9; gu; .printf \"INIT_RETURN version=%x mappings=%p count=%I64x flags=%x advertised=%x\n\", @eax, poi(@$t0), poi(@$t1), dwo(@$t2), dwo(@$t2+4); dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!PrecompiledPointers L10; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!ProbeHostValue0 L3; g"
+bp xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!XeO3ProbeThunk ".printf \"THUNK_ENTER iar=%x cpu=%p guest_memory=%p state_iar=%x\n\", @ecx, @rbx, @r15, dwo(@rbx-8); g"
+bp Emu+0x9c3f1 ".if (@rax == 0x6bf0f910) { .echo PROBE_RETURNED_CLEANLY; r; g } .else { gc }"
+bp xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!CleanupPrecompiledDll ".echo CLEANUP_ENTER; gu; .echo CLEANUP_RETURN; g"
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no!InitPrecompiledDll ".printf \"NO_INIT_ENTER requested=%x\n\", dwo(@r9+4); gu; .printf \"NO_INIT_RETURN version=%x\n\", @eax; g"
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no!XeO3ProbeThunk ".printf \"NO_THUNK_ENTER iar=%x cpu=%p guest_memory=%p state_iar=%x\n\", @ecx, @rbx, @r15, dwo(@rbx-8); g"
+g

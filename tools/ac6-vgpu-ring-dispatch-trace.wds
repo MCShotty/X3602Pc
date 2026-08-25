@@ -1,0 +1,22 @@
+sxd e0000001
+sxd 40080201
+sxd 80000004
+sxe e0423603
+sxd c0000005
+sxd c000001d
+sxd c0000094
+sxe c0000409
+bu VGPUDX12+0x5bf7 ".echo XEO3_AC6_VGPU_RING_EVENT"
+g
+.echo XEO3_AC6_VGPU_RING_EVENT_STOPPED
+.printf "XEO3_AC6_VGPU_DISPATCHER top=%p subsystem=%p processor=%p queue=%p event=%x\n", @rdi, poi(@rdi), poi(@rdi+0x20), poi(@rdi+0x40), @ebx
+u @rip L30
+bu VGPUDX12+0x5c0a
+g
+.echo XEO3_AC6_VGPU_RING_PROCESS_CALL
+.printf "XEO3_AC6_VGPU_PROCESSOR object=%p vtable=%p method=%p\n", @rcx, @rax, poi(@rax+0xa8)
+ln poi(@rax+0xa8)
+u poi(@rax+0xa8) L100
+kv 100
+.echo XEO3_AC6_VGPU_RING_DISPATCH_DUMP_DONE
+q

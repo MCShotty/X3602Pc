@@ -1,0 +1,13 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+ba e1 VGPUDX12+0x5a604 "r @$t1=@r8; r @$t2=@rdx; r @$t3=@r9; r @$t4=@rcx; gc"
+ba e1 VGPUDX12+0x5a60b ".if ((@eax & 0x80000000) != 0) { .echo XEO3_AC6_LEGACY_PLACED_RESOURCE_FAILURE; .printf \"hr=%08x device=%p heap=%p offset=%p desc=%p state=%08x outslot=%p output=%p tid=%x\n\", @eax, @$t4, @$t2, @$t1, @$t3, poi(@rsp+0x20), poi(@rsp+0x38), poi(poi(@rsp+0x38)), @$tid; .echo RESOURCE_DESC; db @$t3 L38; .echo ALLOCATION_INFO; db @rbp-0x38 L18; .echo VGPU_OBJECT; dq @rbx L8; .echo HEAP_OBJECT; dq @$t2 L10; .echo CALL_STACK; kv 100; .echo XEO3_AC6_LEGACY_PLACED_RESOURCE_FAILURE_DONE; q } .else { gc }"
+g

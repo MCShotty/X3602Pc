@@ -1,0 +1,37 @@
+.ecxr
+.echo ===EVENT===
+.lastevent
+.exr -1
+r
+.echo ===MODULES===
+lm m VGPUDX12
+lm m xeo3*
+.echo ===PATCH_BYTES===
+db VGPUDX12+0x153c8 L17
+db VGPUDX12+0x19288 L6
+db VGPUDX12+0x192e9 L6
+db VGPUDX12+0x1932d L7
+db VGPUDX12+0x4da52 L6
+db VGPUDX12+0x5a604 L7
+db VGPUDX12+0x66663 L6
+.echo ===PRIMARY_COUNTERS===
+.printf "status=%08x placed_calls=%I64x site=%08x failure=%08x\n", dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173710), qwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173748), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173750), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173754)
+.printf "last_heap_flags=%08x last_resource_flags=%08x\n", dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173730), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173734)
+.printf "legacy_count=%I64x legacy_failure=%08x committed_count=%I64x committed_failure=%08x\n", qwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173758), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173760), qwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173768), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173770)
+.printf "heap_offset=%I64x heap_size=%I64x allocation_size=%I64x\n", qwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173778), qwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173780), qwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x5173788)
+.echo ===NO_SUFFIX_COUNTERS===
+.printf "status=%08x placed_calls=%I64x site=%08x failure=%08x\n", dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no+0x5173710), qwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no+0x5173748), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no+0x5173750), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no+0x5173754)
+.echo ===STACK===
+kv 80
+.echo ===VGPU_CALLSITE===
+u VGPUDX12+0x192c0 VGPUDX12+0x19360
+.echo ===VGPU_LOCALS===
+dq @rbp-0x100 L40
+.echo ===VGPU_OBJECT===
+dq @rbx L20
+.echo ===RESOURCE_DESC_CANDIDATE===
+db @rdi L50
+.echo ===DEVICE_CANDIDATES===
+dq @r13 L10
+dq @r15 L10
+q

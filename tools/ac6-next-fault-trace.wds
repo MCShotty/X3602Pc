@@ -1,0 +1,19 @@
+sxd e0000001
+sxd 40080201
+sxd 80000004
+sxd c000001d
+sxd c0000094
+sxi c0000005
+sxe c0000409
+sxe e0423603
+g
+.echo XEO3_AC6_NEXT_BREAK
+.lastevent
+.exr -1
+.ecxr
+r
+u @rip-20 L60
+kv 200
+~* kv 100
+.echo XEO3_AC6_NEXT_BREAK_DUMP_DONE
+q

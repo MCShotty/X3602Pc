@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 1,
+  "package": {
+    "name": "Xbox360BackwardCompatibil.PrimaryFuzionFrenzyFuzio",
+    "familyName": "Xbox360BackwardCompatibil.PrimaryFuzionFrenzyFuzio_ksqcvrsvwz2jp",
+    "version": "2607.1523.1.0"
+  },
+  "emu": {
+    "sha256": "D1578E07B533E391D8A81C330D5493BA2D45B252490A818EC148DABE1BA24D06",
+    "imageBase": "0x140000000",
+    "peTimestamp": "0x6A585A77",
+    "sizeOfImage": "0x00D97000"
+  },
+  "vgpuDx12": {
+    "sha256": "67F36AE3E36A7BFD3EF99DAAF6DE64A72DA552ECDF83AD41FB23D393D2B3992C",
+    "peTimestamp": "0x6A585A4F",
+    "sizeOfImage": "0x0073B000",
+    "extendedFetchTable": {
+      "functionRva": "0x000153C8",
+      "allocatorRva": "0x00046C24",
+      "uploadInterfacePointerRva": "0x005F49B8",
+      "uploadMethodVtableOffset": "0x000000B8",
+      "nativeCapacity": 16,
+      "xenosCapacity": 32,
+      "status": "confirmed-static-and-dump"
+    },
+    "samplerAddressModeTable": {
+      "rva": "0x00411970",
+      "expectedValues": [1, 2, 3, 5, 0, 0, 4, 0],
+      "replacementValues": [1, 2, 3, 5, 3, 5, 4, 5],
+      "xenosModes": [
+        "repeat",
+        "mirrored-repeat",
+        "clamp-to-edge",
+        "mirror-clamp-to-edge",
+        "clamp-to-halfway",
+        "mirror-clamp-to-halfway",
+        "clamp-to-border",
+        "mirror-clamp-to-border"
+      ],
+      "reference": {
+        "repository": "https://github.com/xenia-project/xenia",
+        "commit": "95a5c3ee250f80c3b9d139658649d9ffb6db3eec",
+        "path": "src/xenia/gpu/d3d12/d3d12_texture_cache.cc"
+      },
+      "status": "confirmed-static-and-debug-layer"
+    },
+    "tightPlacedResourceFallback": {
+      "gateRva": "0x00019288",
+      "expectedBytes": "0F8510130400",
+      "replacementBytes": "909090909090",
+      "resourceFlag": "0x00000400",
+      "resourceFlagName": "D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT",
+      "failureHresult": "0x887A0001",
+      "nullDereferenceRva": "0x00019340",
+      "status": "confirmed-static-and-full-dump"
+    },
+    "legacyPlacedResourceFallback": {
+      "gateRva": "0x000192E9",
+      "expectedBytes": "0F84E2120400",
+      "replacementBytes": "E9E312040090",
+      "legacyTargetRva": "0x0005A5D1",
+      "enhancedMethod": "ID3D12Device10::CreatePlacedResource2",
+      "legacyMethod": "ID3D12Device::CreatePlacedResource",
+      "failureHresult": "0x887A0001",
+      "nullDereferenceRva": "0x00019340",
+      "status": "confirmed-static-and-patched-dump"
+    },
+    "placedResourceCalls": [
+      {
+        "rva": "0x0001932D",
+        "expectedBytes": "41FF9368020000",
+        "method": "ID3D12Device10::CreatePlacedResource2",
+        "allocatorFunctionRva": "0x00019214",
+        "status": "confirmed-static"
+      },
+      {
+        "rva": "0x0005A604",
+        "expectedBytes": "41FF93E8000000",
+        "method": "ID3D12Device::CreatePlacedResource",
+        "allocatorFunctionRva": "0x00019214",
+        "status": "confirmed-static-cold-path"
+      },
+      {
+        "rva": "0x0004DA52",
+        "expectedBytes": "FF9068020000",
+        "method": "ID3D12Device10::CreatePlacedResource2",
+        "allocatorFunctionRva": "0x0004D964",
+        "status": "confirmed-static"
+      },
+      {
+        "sequenceRva": "0x00066663",
+        "callRva": "0x00066666",
+        "expectedBytes": "498BCB41FFD2",
+        "method": "ID3D12Device::CreatePlacedResource",
+        "allocatorFunctionRva": "0x0004D964",
+        "status": "confirmed-static-cold-path"
+      }
+    ],
+    "placedResourceCallFalsePositives": [
+      {
+        "rva": "0x0000DD49",
+        "reason": "command-list interface method"
+      },
+      {
+        "rva": "0x00042AAD",
+        "reason": "DXGI adapter enumeration"
+      }
+    ]
+  },
+  "aotContract": {
+    "abiVersion": 46,
+    "callStacksEnabled": true,
+    "mappingRecordSize": 8,
+    "mappingGuestAddressKind": "image-relative-rva",
+    "importRecordSize": 8,
+    "importGuestAddressKind": "absolute-address",
+    "pairedNoSuffixDllRequired": true
+  },
+  "hostInterface": {
+    "singletonRva": "0x0011F2A8",
+    "vtableRva": "0x000FF028",
+    "methods": [
+      {
+        "name": "executeIar",
+        "vtableOffset": "0x000",
+        "emuRva": "0x00063950",
+        "status": "confirmed-static"
+      },
+      {
+        "name": "fatal",
+        "vtableOffset": "0x020",
+        "status": "confirmed-static"
+      },
+      {
+        "name": "queryHostValues",
+        "vtableOffset": "0x028",
+        "emuRva": "0x00063AD0",
+        "status": "confirmed-static-and-dynamic"
+      },
+      {
+        "name": "acquireProfilerContext",
+        "vtableOffset": "0x108",
+        "emuRva": "0x00064680",
+        "status": "confirmed-static"
+      }
+    ],
+    "queryHostValuesSample": [
+      "0x0000000000989680",
+      "0x000000000004FCCD",
+      "run-dependent"
+    ]
+  },
+  "fiberLocalState": {
+    "flsIndexRva": "0x0011F2A0",
+    "cpuStateObjectOffset": "0x10",
+    "cpuStateAnchorOffset": "0x80",
+    "status": "confirmed-static",
+    "evidenceFunctionRva": "0x00063950"
+  },
+  "precompiledPointers": [
+    {
+      "index": 0,
+      "emuRva": "0x0009C470",
+      "name": "dispatchIar"
+    },
+    {
+      "index": 1,
+      "emuRva": "0x0009C6F3",
+      "name": "invokeKernelOrdinal"
+    },
+    {
+      "index": 2,
+      "emuRva": "0x0009C70C",
+      "name": "invokeExtendedImport"
+    },
+    {
+      "index": 3,
+      "emuRva": "0x00060BB0",
+      "name": "packConditionRegister"
+    },
+    {
+      "index": 4,
+      "emuRva": "0x00060BD0",
+      "name": "readTimeBase"
+    },
+    {
+      "index": 5,
+      "emuRva": "0x00060C00",
+      "name": "raiseGuestException"
+    },
+    {
+      "index": 6,
+      "value": "0x0"
+    },
+    {
+      "index": 7,
+      "value": "0x0"
+    },
+    {
+      "index": 8,
+      "emuRva": "0x00063590",
+      "name": "mmioRead32"
+    },
+    {
+      "index": 9,
+      "emuRva": "0x00063690",
+      "name": "mmioWrite32"
+    },
+    {
+      "indexRange": [
+        10,
+        15
+      ],
+      "value": "0x0"
+    }
+  ],
+  "dispatcher": {
+    "entryRva": "0x0009C370",
+    "lookupRva": "0x0009C470",
+    "nonCallStackEntryRva": "0x0009C458",
+    "nonCallStackExitRva": "0x0009C480",
+    "unmappedIarRva": "0x0009C490"
+  },
+  "cpuState": {
+    "anchorRegister": "RBX",
+    "guestMemoryRegister": "R15",
+    "guestMemoryBaseObserved": "0x0000000100000000",
+    "contextObjectOffsetFromAnchor": "-0x80",
+    "crBaseOffset": "-0x40",
+    "crFieldStride": 4,
+    "lrOffset": "-0x20",
+    "ctrOffset": "-0x18",
+    "dispatchCookieOffset": "-0x10",
+    "iarOffset": "-0x08",
+    "mxcsrOffset": "0x10",
+    "xerOffsets": {
+      "so": "0x14",
+      "ov": "0x15",
+      "ca": "0x16",
+      "byteCount": "0x17"
+    },
+    "gprOffsets": [
+      "0x80",
+      "0x08",
+      "0x88",
+      "0x00",
+      "0x18",
+      "0x20",
+      "0x28",
+      "0x30",
+      "0x38",
+      "0x40",
+      "0x48",
+      "0x50",
+      "0x58",
+      "0x90",
+      "0x98",
+      "0xA0",
+      "0xA8",
+      "0xB0",
+      "0xB8",
+      "0xC0",
+      "0xC8",
+      "0xD0",
+      "0xD8",
+      "0xE0",
+      "0xE8",
+      "0xF0",
+      "0xF8",
+      "0x100",
+      "0x60",
+      "0x68",
+      "0x70",
+      "0x78"
+    ],
+    "fprLayout": {
+      "f0": "-0x60",
+      "f1": "-0x58",
+      "f2ThroughF12": "0x108 + (index - 2) * 8",
+      "f13": "-0x50",
+      "f14ThroughF30": "0x160 + (index - 14) * 8",
+      "f31": "-0x48"
+    },
+    "fpscrOffset": "0x1E8",
+    "vscrOffset": "0x1EC",
+    "msrOffset": "0x1F0",
+    "vectorLayout": {
+      "v0ThroughV62": "0x200 + index * 16",
+      "v63": "-0x80",
+      "v64ThroughV126": "0x5F0 + (index - 64) * 16",
+      "v127": "-0x70"
+    }
+  },
+  "probeEvidence": {
+    "entryIar": "0x821F5ED0",
+    "mappingCount": 230,
+    "importCount": 229,
+    "mappedThunkExecuted": true,
+    "nativeCallStackReturnSucceeded": true,
+    "nextUnmappedIar": "0x8005F0B4",
+    "hostCleanupObserved": false
+  }
+}

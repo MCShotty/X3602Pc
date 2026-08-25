@@ -1,0 +1,13 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo XEO3_AC6_HUFFMAN_CALLSITE_DISASSEMBLY
+uf xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_822CEAC0
+q

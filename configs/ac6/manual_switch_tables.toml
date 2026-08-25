@@ -1,0 +1,44 @@
+# XenonAnalyse requires a nearby unsigned bounds check to infer an absolute
+# jump-table length. This table is selected by a value that AC6 constrains
+# before entering the containing function, so the compiler emits no local
+# bounds check. The four big-endian words at 0x820B54C4 are code addresses.
+[[switch]]
+base = 0x820B54AC
+r = 6
+labels = [
+    0x820B54D4,
+    0x820B54DC,
+    0x820B54E4,
+    0x820B54EC,
+]
+
+# The bounds check for r8 is separated from this dispatch by a VMX distance
+# calculation. The five big-endian words at 0x82291768 are absolute guest
+# targets; without this table XenonRecomp exits through its generic indirect
+# dispatcher and XeO3 fast-fails on the first Mission 01 target, 0x8229177C.
+[[switch]]
+base = 0x82291750
+r = 8
+default = 0x82291B98
+labels = [
+    0x8229177C,
+    0x822917CC,
+    0x82291804,
+    0x82291928,
+    0x82291960,
+]
+
+# The bounds check for r11 is separated from this dispatch by a long Xenon
+# VMX transform, so XenonAnalyse does not associate it with the inline table.
+# The five big-endian words at 0x822AD748 are guest code addresses.
+[[switch]]
+base = 0x822AD730
+r = 11
+default = 0x822AD908
+labels = [
+    0x822AD75C,
+    0x822AD804,
+    0x822AD8DC,
+    0x822AD75C,
+    0x822AD75C,
+]

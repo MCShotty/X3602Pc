@@ -1,0 +1,34 @@
+sxd e0000001
+sxd 40010006
+sxd 4001000a
+sxd 40080201
+sxd 80000003
+sxd 80000004
+sxd 80000007
+sxd c000001d
+sxd c0000094
+sxd c0000409
+sxd e06d7363
+sxd c0000005
+bu /w "(@r8 & 0xffffffff) == 0x70" xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_822BF3F8+0x161e
+.echo XEO3_AC6_NULL_READ_CAPTURE_ARMED
+g
+.echo XEO3_AC6_NULL_READ_HIT
+.lastevent
+r
+.echo XEO3_AC6_NULL_READ_HOST_CODE
+u @rip-60 L60
+.echo XEO3_AC6_NULL_READ_PPC_CONTEXT
+.printf "ctx=%p base=%p ea=%p r1=%p r3=%p r11=%p r30=%p r31=%p lr=%p ctr=%p\n", @rdi, @rsi, @r8, poi(@rdi+8), poi(@rdi+0x18), poi(@rdi+0x58), poi(@rdi+0xf0), poi(@rdi+0xf8), poi(@rdi+0x100), poi(@rdi+0x108)
+.echo XEO3_AC6_NULL_READ_GPRS
+dq @rdi L20
+.echo XEO3_AC6_NULL_READ_R31_OBJECT
+dd @rsi+(poi(@rdi+0xf8)&0xffffffff) L40
+.echo XEO3_AC6_NULL_READ_R30_OBJECT
+dd @rsi+(poi(@rdi+0xf0)&0xffffffff) L40
+.echo XEO3_AC6_NULL_READ_STACK
+kv 100
+.dump /m "D:\Games\AC6 shit\XeO3-AC6-lab\ProbeLogs\ac6-mission-load-null-read.dmp"
+.echo XEO3_AC6_NULL_READ_CAPTURE_END
+.detach
+q

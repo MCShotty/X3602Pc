@@ -1,0 +1,21 @@
+sxi e0000001
+sxi 40080201
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bp xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x14671ce ".if ((@r8 - 0x82000000) >= 0xaa0000) { .echo XEO3_AC6_BAD_VTABLE_POINTER; .printf \"host_base=%p ctx=%p effective_guest=%08x vtable=%08x object=%08x node=%08x owner=%08x anchor=%08x lr=%08x\\n\", @rsi, @rdi, @r8, dwo(@rdi+0x58), dwo(@rdi), dwo(@rdi+0xf8), dwo(@rdi+0xf0)-0x234, dwo(@rdi+0xf0)-0x24, dwo(@rdi+0x100); r; dq @rdi L40; .echo XEO3_AC6_LIST_NODE; dd (@rsi+dwo(@rdi+0xf8)) L40; .echo XEO3_AC6_OBJECT; dd (@rsi+dwo(@rdi)) L40; .echo XEO3_AC6_OWNER; dd (@rsi+dwo(@rdi+0xf0)-0x234) L100; kv 100; .echo XEO3_AC6_BAD_VTABLE_POINTER_DUMP_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_VTABLE_TRACE_FALLBACK_BREAK
+.lastevent
+.exr -1
+r
+kv 100
+.echo XEO3_AC6_VTABLE_TRACE_FALLBACK_DUMP_DONE
+q

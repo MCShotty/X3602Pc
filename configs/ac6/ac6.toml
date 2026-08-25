@@ -1,0 +1,212 @@
+[main]
+file_path = "private/default.xex"
+out_directory_path = "../../out/ac6/generated"
+switch_table_file_path = "../../out/ac6/switch_tables.toml"
+
+skip_lr = false
+skip_msr = false
+ctr_as_local = false
+xer_as_local = false
+reserved_as_local = false
+cr_as_local = false
+non_argument_as_local = false
+non_volatile_as_local = false
+
+restgprlr_14_address = 0x82382A30
+savegprlr_14_address = 0x823829E0
+restfpr_14_address = 0x82383F7C
+savefpr_14_address = 0x82383F30
+restvmx_14_address = 0x823853E8
+savevmx_14_address = 0x82385150
+restvmx_64_address = 0x8238547C
+savevmx_64_address = 0x823851E4
+
+# Address-taken continuation blocks and leaf accessors between adjacent pdata
+# functions, plus functions
+# whose pdata ranges split conditional-return fallthrough tails. Passive XeO3
+# traces proved 0x8228AFE0 and 0x822AF840 are externally re-entered
+# virtual-dispatch functions. Mission 01 runtime dispatch proved the three
+# 0x8228BC30 predicate helpers and six 0x823222F0 virtual-method tail thunks
+# are separate entries. The remaining constructed-address, non-local-branch
+# candidates were boundary-checked against the current mapping and PPC
+# disassembly; split ranges below stop before the next known function. A
+# corrected hidden-entry scan also found the data/vtable-referenced functions
+# following bctr terminals; all listed bctr entries were disassembled through
+# their terminal boundary.
+functions = [
+    # sub_82252068 dispatches here through ctr after restoring the containing
+    # function's live PPC state. Keep the original indirect dispatcher and
+    # expose each unique case continuation through its shared epilogue to
+    # XeO3. Repeated table entries all resolve to the 0x82252AB0 epilogue.
+    { address = 0x822526AC, size = 0x414 },
+    { address = 0x8225277C, size = 0x344 },
+    { address = 0x822527C0, size = 0x300 },
+    { address = 0x82252814, size = 0x2AC },
+    { address = 0x82252868, size = 0x258 },
+    { address = 0x822529E8, size = 0x0D8 },
+    { address = 0x82252A38, size = 0x088 },
+    { address = 0x82252AB0, size = 0x010 },
+    { address = 0x82272658, size = 0x10 },
+    { address = 0x82272668, size = 0x10 },
+    { address = 0x822728A0, size = 0x18 },
+    { address = 0x822728B8, size = 0x18 },
+    { address = 0x822728D0, size = 0x18 },
+    { address = 0x822728E8, size = 0x18 },
+    { address = 0x82272900, size = 0x18 },
+    { address = 0x82272918, size = 0x18 },
+    { address = 0x82272930, size = 0x18 },
+    { address = 0x82272948, size = 0x18 },
+    { address = 0x82272960, size = 0x18 },
+    { address = 0x82272978, size = 0x18 },
+    { address = 0x82272990, size = 0x18 },
+    { address = 0x822729A8, size = 0x18 },
+    { address = 0x822729C0, size = 0x18 },
+    { address = 0x822729D8, size = 0x08 },
+    { address = 0x82272C08, size = 0x18 },
+    { address = 0x82272C20, size = 0x18 },
+    { address = 0x82272C38, size = 0x18 },
+    { address = 0x82272C50, size = 0x18 },
+    { address = 0x82272C68, size = 0x18 },
+    { address = 0x82272C80, size = 0x18 },
+    { address = 0x82272C98, size = 0x18 },
+    { address = 0x82272CB0, size = 0x18 },
+    { address = 0x82272CC8, size = 0x18 },
+    { address = 0x82272CE0, size = 0x18 },
+    { address = 0x82272CF8, size = 0x18 },
+    { address = 0x82288BC8, size = 0x10 },
+    { address = 0x8228AFE0, size = 0x18 },
+    { address = 0x822AF840, size = 0x34 },
+    { address = 0x8228B2F0, size = 0x08 },
+    { address = 0x8228B2F8, size = 0x08 },
+    { address = 0x8228BDA8, size = 0x08 },
+    { address = 0x8228BDB0, size = 0x08 },
+    { address = 0x8228BDB8, size = 0x08 },
+    { address = 0x8228BDC0, size = 0x08 },
+    { address = 0x8228BDC8, size = 0x20 },
+    { address = 0x8228BC30, size = 0x1C },
+    { address = 0x8228BC50, size = 0x1C },
+    { address = 0x8228BC70, size = 0x20 },
+    { address = 0x822AACA0, size = 0x78 },
+    { address = 0x822B0FA0, size = 0x10 },
+    { address = 0x822B0FB0, size = 0x10 },
+    { address = 0x822B0FC0, size = 0x10 },
+    { address = 0x822B95F0, size = 0x10 },
+    { address = 0x822C1638, size = 0x18 },
+    { address = 0x822C1660, size = 0x90 },
+    { address = 0x822C1880, size = 0x64 },
+    { address = 0x822D3DA0, size = 0x2C },
+    { address = 0x822DD838, size = 0x2C },
+    { address = 0x822E0EB8, size = 0x08 },
+    { address = 0x822E35B0, size = 0x40 },
+    { address = 0x822E4FC8, size = 0x40 },
+    { address = 0x822EFA00, size = 0x18 },
+    { address = 0x822EFA18, size = 0x18 },
+    { address = 0x822EFA30, size = 0x18 },
+    { address = 0x822EFA48, size = 0x28 },
+    { address = 0x822EFD00, size = 0x78 },
+    { address = 0x822EFE08, size = 0x70 },
+    { address = 0x822EFE78, size = 0x50 },
+    { address = 0x822F0BD8, size = 0x0C },
+    { address = 0x822F26E0, size = 0x48 },
+    { address = 0x822F2BB8, size = 0x44 },
+    { address = 0x822F2C58, size = 0x2C },
+    { address = 0x822F2C90, size = 0x2C },
+    { address = 0x822F2CC8, size = 0x2C },
+    { address = 0x822F2D00, size = 0x2C },
+    { address = 0x822F2D38, size = 0x2C },
+    { address = 0x822F2D70, size = 0x2C },
+    { address = 0x822F3030, size = 0x2C },
+    { address = 0x822F4330, size = 0x08 },
+    { address = 0x822F5230, size = 0x08 },
+    { address = 0x822F7120, size = 0x6C },
+    { address = 0x822F8988, size = 0x4C },
+    { address = 0x823038B8, size = 0x44 },
+    { address = 0x82319198, size = 0x18 },
+    { address = 0x82321578, size = 0x40 },
+    { address = 0x82321628, size = 0x24 },
+    { address = 0x82321660, size = 0x40 },
+    { address = 0x823216F0, size = 0x1C },
+    { address = 0x82321770, size = 0x5C },
+    { address = 0x823217E0, size = 0x1C },
+    { address = 0x82321838, size = 0x24 },
+    { address = 0x82321898, size = 0x44 },
+    { address = 0x823218F0, size = 0x18 },
+    { address = 0x82321940, size = 0x7C },
+    { address = 0x823219D0, size = 0x40 },
+    { address = 0x823222F0, size = 0x10 },
+    { address = 0x82322300, size = 0x10 },
+    { address = 0x82322310, size = 0x10 },
+    { address = 0x82322320, size = 0x10 },
+    { address = 0x82322330, size = 0x10 },
+    { address = 0x82322340, size = 0x10 },
+    { address = 0x823830F0, size = 0xA0 },
+]
+
+[[midasm_hook]]
+address = 0x822CE2B8
+name = "Ac6TraceHuffmanTableInput"
+registers = ["r3", "r4", "r5"]
+
+[[midasm_hook]]
+address = 0x822CEC74
+name = "Ac6TraceCodeLengthTokenBegin"
+registers = ["r1", "r28", "r27", "r31"]
+
+[[midasm_hook]]
+address = 0x822CEF90
+name = "Ac6TraceCodeLengthTokenEnd"
+registers = ["r1", "r28", "r29", "r9", "r10", "r11", "r24", "r27", "r31"]
+
+[[midasm_hook]]
+address = 0x822CEDBC
+name = "Ac6TraceCodeLengthRefillReturn"
+registers = ["r1", "r28", "r29", "r3", "r4", "r5", "r31"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x822CEE0C
+name = "Ac6TraceCodeLengthRefillReturn"
+registers = ["r1", "r28", "r29", "r3", "r4", "r5", "r31"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x822CEEA0
+name = "Ac6TraceCodeLengthRefillReturn"
+registers = ["r1", "r28", "r29", "r3", "r4", "r5", "r31"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x822CEF1C
+name = "Ac6TraceCodeLengthRefillReturn"
+registers = ["r1", "r28", "r29", "r3", "r4", "r5", "r31"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x822CEFA8
+name = "Ac6TraceLiteralCopyBefore"
+registers = ["r3", "r4", "r5"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x822CEFAC
+name = "Ac6TraceLiteralCopyAfter"
+registers = []
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x822CEFBC
+name = "Ac6TraceDistanceCopyBefore"
+registers = ["r3", "r4", "r5"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x822CEFC0
+name = "Ac6TraceDistanceCopyAfter"
+registers = []
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x8237C9F4
+name = "Ac6TraceIndirectTypeIndex"
+registers = ["r11", "r23", "r31", "r30"]
+after_instruction = true

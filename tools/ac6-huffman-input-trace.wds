@@ -1,0 +1,20 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED_FOR_HUFFMAN_INPUT_TRACE
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_822CDE18 ".if (wo(@rdx+dwo(@rcx)+0x84) == 0x0130) { .echo XEO3_AC6_DYNAMIC_HUFFMAN_INPUT; .printf \"translated_context=%p guest_base=%p guest_r1=%08x guest_r3=%08x count=%08x root_bits=%08x\n\", @rcx, @rdx, dwo(@rcx+0x10), dwo(@rcx), dwo(@rcx+0x20), dwo(@rcx+0x28); .echo XEO3_AC6_HUFFMAN_SOURCE_STACK; dw (@rdx+dwo(@rcx+0x10)+0x70) L110; .echo XEO3_AC6_HUFFMAN_DESTINATION; dw (@rdx+dwo(@rcx)+0x6c) L110; .echo XEO3_AC6_DEFLATE_STATE; db (@rdx+dwo(@rcx)) L100; .echo XEO3_AC6_HUFFMAN_INPUT_TRACE_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_HUFFMAN_INPUT_TRACE_FALLBACK
+.lastevent
+r
+kv 100
+q

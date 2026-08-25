@@ -1,0 +1,20 @@
+sxi e0000001
+sxi 40010006
+sxi 4001000a
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi 80000007
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxi e06d7363
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo XEO3_AC6_HOT_LOOP_SNAPSHOT_BEGIN
+r @$t0=poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeCriticalSectionEventCount)
+.printf "COUNTERS dispatch=%I64u imports=%I64u last_iar=%08x last_thunk=%08x last_target=%08x pad_polls=%I64u critical_events=%I64u try_failure_streak=%I64u archive_reads=%I64u archive_failures=%I64u archive_signals=%I64u archive_signal_failures=%I64u\n", poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeDispatchCount), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeImportCount), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeLastGuestIar), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeLastImportThunk), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeLastImportTarget), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVirtualPadPollCount), @$t0, poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeRtlTryLastFailureStreak), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveReadCount), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveReadFailureCount), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveSignalCount), poi(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveSignalFailureCount)
+.if (@$t0 == 0) { .echo CRITICAL_RING_EMPTY } .else { .for (r @$t1=0; @$t1<8; r @$t1=@$t1+1) { r @$t2=(@$t0-1-@$t1)&0xff; r @$t3=xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeCriticalSectionEvents+(@$t2*0x58); .printf "CRITICAL_EVENT seq=%I64u tick=%I64u cpu=%p streak=%I64u host_tid=%x op=%u thunk=%08x lock=%08x lr=%08x r13=%08x guest_tid=%08x before=[%d,%u,%08x] result=%08x after=[%d,%u,%08x]\n", poi(@$t3), poi(@$t3+8), poi(@$t3+0x10), poi(@$t3+0x18), dwo(@$t3+0x20), dwo(@$t3+0x24), dwo(@$t3+0x28), dwo(@$t3+0x2c), dwo(@$t3+0x30), dwo(@$t3+0x34), dwo(@$t3+0x38), dwo(@$t3+0x3c), dwo(@$t3+0x40), dwo(@$t3+0x44), dwo(@$t3+0x48), dwo(@$t3+0x4c), dwo(@$t3+0x50), dwo(@$t3+0x54) } }
+!runaway 3
+.echo XEO3_AC6_HOT_LOOP_SNAPSHOT_END
+.detach
+q

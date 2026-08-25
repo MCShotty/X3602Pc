@@ -1,0 +1,28 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_822CF510 ".if (dwo(@rcx) == 0x826A1AA8) { .echo XEO3_AC6_TARGET_STREAM_POLL_ENTRY } .else { gc }"
+g
+r $t0=@rcx
+r $t1=@rdx
+.printf "host_tid=%x context=%p guest_base=%p r1=%08X r3=%08X lr=%08X\n", @$tid, @$t0, @$t1, dwo(@$t0+0x10), dwo(@$t0), dwo(@$t0+0x100)
+.echo XEO3_AC6_STREAM_BEFORE
+db 00000001826A1AA8 L80
+.echo XEO3_AC6_CONTEXT_BEFORE
+dq @$t0 L40
+gu
+.echo XEO3_AC6_TARGET_STREAM_POLL_RETURN
+.printf "result=%016I64X r1=%08X lr=%08X iar=%08X\n", poi(@$t0), dwo(@$t0+0x10), dwo(@$t0+0x100), dwo(@$t0-8)
+.echo XEO3_AC6_STREAM_AFTER
+db 00000001826A1AA8 L80
+.echo XEO3_AC6_CONTEXT_AFTER
+dq @$t0 L40
+kv 40
+.echo XEO3_AC6_TARGET_STREAM_POLL_TRACE_DONE
+.detach
+q

@@ -1,0 +1,21 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED_FOR_MEMORY_FAULT_TRACE
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bp Emu+0x5f460 ".if (@edx == 0xc0000005) { .echo XEO3_AC6_AOT_MEMORY_FAULT; .printf \"exception_record=%p context_record=%p code=%08x host_rip=%p access=%p fault_address=%p\n\", poi(@r8), poi(@r8+8), dwo(poi(@r8)), poi(poi(@r8)+0x10), poi(poi(@r8)+0x20), poi(poi(@r8)+0x28); .printf \"dispatch_r15=%p physical_base=%p virtual_base=%p third_base=%p xex_mode=%02x\n\", @r15, poi(Emu+0x1436d8), poi(Emu+0x143660), poi(Emu+0x143658), by(Emu+0x12c116); .printf \"fls_object=%p cpu_state=%p iar=%08x msr=%08x guest_lr=%08x guest_ctr=%08x\n\", @rcx, poi(@rcx+0x10), dwo(poi(@rcx+0x10)+0x78), dwo(poi(@rcx+0x10)+0x270), dwo(poi(@rcx+0x10)+0x60), dwo(poi(@rcx+0x10)+0x68); .echo XEO3_AC6_EXCEPTION_RECORD; .exr poi(@r8); .echo XEO3_AC6_CONTEXT_RECORD; .cxr poi(@r8+8); r; .printf \"translated_context=%p guest_base=%p\n\", @rdi, @rsi; .echo XEO3_AC6_TRANSLATED_CONTEXT; dq @rdi L80; .echo XEO3_AC6_FAULTING_CODE; ln @rip; u @rip-40 L80; kv 100; .echo XEO3_AC6_MEMORY_FAULT_TRACE_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_MEMORY_FAULT_TRACE_FALLBACK
+.lastevent
+.exr -1
+r
+kv 100
+q

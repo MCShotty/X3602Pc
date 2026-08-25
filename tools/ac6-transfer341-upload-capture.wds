@@ -1,0 +1,11 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+.sympath+ D:\Games\AC6 shit\XeO3-AC6-lab
+r @$t0=0
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuPatchStatus-0x1907A0 ".if (@r8 == 0x300) { .printf \"XEO3_AC6_UPLOAD300 index=%I64u context=%p source=%p tid=%x\\n\", @$t0, @rcx, @rdx, @$tid; dd @rdx Lc0; r @$t0=@$t0+1; .if (@$t0 >= 16) { .detach; q } .else { gc } } .else { gc }"
+g

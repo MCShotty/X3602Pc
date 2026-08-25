@@ -1,0 +1,428 @@
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index 89fa08f..a98301c 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -1,6 +1,7 @@
+ #include "pch.h"
+ #include "recompiler.h"
+ #include <xex_patcher.h>
++#include <array>
+ 
+ static uint64_t ComputeMask(uint32_t mstart, uint32_t mstop)
+ {
+@@ -10,57 +11,283 @@ static uint64_t ComputeMask(uint32_t mstart, uint32_t mstop)
+     return mstart <= mstop ? value : ~value;
+ }
+ 
+-static bool GeneratedCodeWritesStackPointer(const std::string_view generatedCode)
++struct GeneratedStateWrites
+ {
+-    constexpr std::string_view stackPointerPrefix = "ctx.r1.";
+-    size_t lineStart = 0;
++    std::array<bool, 32> gpr{};
++    std::array<bool, 32> fpr{};
++    std::array<bool, 128> vector{};
++    std::array<bool, 8> condition{};
++    bool lr{};
++    bool ctr{};
++    bool xer{};
++    bool fpscr{};
++    bool vscr{};
++    bool msr{};
++};
++
++static std::string_view TrimGeneratedLine(std::string_view line)
++{
++    const auto contentStart = line.find_first_not_of(" \t");
++    if (contentStart == std::string_view::npos)
++    {
++        return {};
++    }
++    line.remove_prefix(contentStart);
++    return line;
++}
+ 
++static bool FindIndexedRegister(
++    const std::string_view line,
++    const std::string_view prefix,
++    const size_t count,
++    size_t& index)
++{
++    auto position = line.find(prefix);
++    while (position != std::string_view::npos)
++    {
++        auto cursor = position + prefix.size();
++        size_t value = 0;
++        const auto digitStart = cursor;
++        while (cursor < line.size() &&
++               line[cursor] >= '0' &&
++               line[cursor] <= '9')
++        {
++            value = value * 10 + static_cast<size_t>(line[cursor] - '0');
++            ++cursor;
++        }
++        if (cursor != digitStart && value < count)
++        {
++            index = value;
++            return true;
++        }
++        position = line.find(prefix, position + prefix.size());
++    }
++    return false;
++}
++
++static bool ParseIndexedRegisterAtStart(
++    const std::string_view line,
++    const std::string_view prefix,
++    const size_t count,
++    size_t& index)
++{
++    if (line.compare(0, prefix.size(), prefix) != 0)
++    {
++        return false;
++    }
++
++    auto cursor = prefix.size();
++    size_t value = 0;
++    const auto digitStart = cursor;
++    while (cursor < line.size() &&
++           line[cursor] >= '0' &&
++           line[cursor] <= '9')
++    {
++        value = value * 10 + static_cast<size_t>(line[cursor] - '0');
++        ++cursor;
++    }
++    if (cursor == digitStart || value >= count)
++    {
++        return false;
++    }
++
++    index = value;
++    return true;
++}
++
++static void CollectGeneratedStateWrites(
++    const std::string_view line,
++    GeneratedStateWrites& writes)
++{
++    const auto trimmed = TrimGeneratedLine(line);
++    size_t index = 0;
++
++    if (ParseIndexedRegisterAtStart(
++            trimmed,
++            "ctx.r",
++            writes.gpr.size(),
++            index))
++    {
++        writes.gpr[index] = true;
++    }
++    if (ParseIndexedRegisterAtStart(
++            trimmed,
++            "ctx.f",
++            writes.fpr.size(),
++            index))
++    {
++        writes.fpr[index] = true;
++    }
++    if (ParseIndexedRegisterAtStart(
++            trimmed,
++            "ctx.v",
++            writes.vector.size(),
++            index))
++    {
++        writes.vector[index] = true;
++    }
++    if (ParseIndexedRegisterAtStart(
++            trimmed,
++            "ctx.cr",
++            writes.condition.size(),
++            index))
++    {
++        writes.condition[index] = true;
++    }
++
++    const auto firstArgumentEnd = trimmed.find(',');
++    const auto firstArgument = trimmed.substr(0, firstArgumentEnd);
++    if ((trimmed.compare(0, 15, "simde_mm_store_") == 0 ||
++         trimmed.compare(0, 5, "PPC_V") == 0) &&
++        FindIndexedRegister(
++            firstArgument,
++            "ctx.v",
++            writes.vector.size(),
++            index))
++    {
++        writes.vector[index] = true;
++    }
++    if (trimmed.compare(0, 5, "PPC_V") == 0 &&
++        FindIndexedRegister(
++            trimmed,
++            "&ctx.cr",
++            writes.condition.size(),
++            index))
++    {
++        writes.condition[index] = true;
++    }
++    if (trimmed.compare(0, 9, "PPC_VPKSW") == 0 &&
++        trimmed.find("ctx.vscr") != std::string_view::npos)
++    {
++        writes.vscr = true;
++    }
++
++    writes.lr =
++        writes.lr ||
++        trimmed.compare(0, 6, "ctx.lr") == 0;
++    writes.ctr =
++        writes.ctr ||
++        trimmed.compare(0, 7, "ctx.ctr") == 0 ||
++        trimmed.compare(0, 9, "--ctx.ctr") == 0;
++    writes.xer =
++        writes.xer ||
++        trimmed.compare(0, 7, "ctx.xer") == 0;
++    writes.fpscr =
++        writes.fpscr ||
++        trimmed.compare(0, 9, "ctx.fpscr") == 0;
++    writes.vscr =
++        writes.vscr ||
++        trimmed.compare(0, 8, "ctx.vscr") == 0;
++    writes.msr =
++        writes.msr ||
++        trimmed.compare(0, 7, "ctx.msr") == 0;
++}
++
++static bool IsGeneratedStateBoundary(const std::string_view line)
++{
++    const auto trimmed = TrimGeneratedLine(line);
++    return
++        trimmed.compare(0, 2, "if") == 0 ||
++        trimmed.compare(0, 4, "goto") == 0 ||
++        trimmed.compare(0, 6, "return") == 0 ||
++        trimmed.find("(ctx, base)") != std::string_view::npos ||
++        trimmed.find("PPC_CALL_") != std::string_view::npos ||
++        trimmed.find("PPC_LOAD_") != std::string_view::npos ||
++        trimmed.find("PPC_STORE_") != std::string_view::npos ||
++        trimmed.find("PPC_MM_") != std::string_view::npos ||
++        trimmed.find("PPC_READ_TIME_BASE") != std::string_view::npos;
++}
++
++static void FlushGeneratedStateWrites(
++    std::string& output,
++    GeneratedStateWrites& writes)
++{
++    for (size_t index = 0; index < writes.gpr.size(); ++index)
++    {
++        if (writes.gpr[index])
++            fmt::format_to(
++                std::back_inserter(output),
++                "\tPPC_PUBLISH_GPR({});\n",
++                index);
++    }
++    for (size_t index = 0; index < writes.fpr.size(); ++index)
++    {
++        if (writes.fpr[index])
++            fmt::format_to(
++                std::back_inserter(output),
++                "\tPPC_PUBLISH_FPR({});\n",
++                index);
++    }
++    for (size_t index = 0; index < writes.vector.size(); ++index)
++    {
++        if (writes.vector[index])
++            fmt::format_to(
++                std::back_inserter(output),
++                "\tPPC_PUBLISH_VECTOR({});\n",
++                index);
++    }
++    for (size_t index = 0; index < writes.condition.size(); ++index)
++    {
++        if (writes.condition[index])
++            fmt::format_to(
++                std::back_inserter(output),
++                "\tPPC_PUBLISH_CR({});\n",
++                index);
++    }
++    if (writes.lr)
++        output += "\tPPC_PUBLISH_LR();\n";
++    if (writes.ctr)
++        output += "\tPPC_PUBLISH_CTR();\n";
++    if (writes.xer)
++        output += "\tPPC_PUBLISH_XER();\n";
++    if (writes.fpscr)
++        output += "\tPPC_PUBLISH_FPSCR();\n";
++    if (writes.vscr)
++        output += "\tPPC_PUBLISH_VSCR();\n";
++    if (writes.msr)
++        output += "\tPPC_PUBLISH_MSR();\n";
++    writes = GeneratedStateWrites{};
++}
++
++static void InstrumentGeneratedStateUpdates(
++    std::string& output,
++    const size_t generatedCodeStart)
++{
++    const std::string generatedCode =
++        output.substr(generatedCodeStart);
++    output.resize(generatedCodeStart);
++
++    GeneratedStateWrites writes{};
++    size_t lineStart = 0;
+     while (lineStart < generatedCode.size())
+     {
+         const auto lineEnd = generatedCode.find('\n', lineStart);
+-        auto line = generatedCode.substr(
+-            lineStart,
+-            lineEnd == std::string_view::npos
++        const auto lineLength =
++            lineEnd == std::string::npos
+                 ? generatedCode.size() - lineStart
+-                : lineEnd - lineStart);
+-        const auto contentStart = line.find_first_not_of(" \t");
+-        if (contentStart != std::string_view::npos)
+-        {
+-            line.remove_prefix(contentStart);
+-            if (line.compare(
+-                    0,
+-                    stackPointerPrefix.size(),
+-                    stackPointerPrefix) == 0)
+-            {
+-                const auto assignment = line.find('=');
+-                if (assignment != std::string_view::npos)
+-                {
+-                    const auto previous =
+-                        assignment == 0 ? '\0' : line[assignment - 1];
+-                    const auto next =
+-                        assignment + 1 >= line.size()
+-                            ? '\0'
+-                            : line[assignment + 1];
+-                    if (next != '=' &&
+-                        previous != '=' &&
+-                        previous != '!' &&
+-                        previous != '<' &&
+-                        previous != '>')
+-                    {
+-                        return true;
+-                    }
+-                }
+-            }
++                : lineEnd - lineStart;
++        const auto line =
++            std::string_view(generatedCode).substr(lineStart, lineLength);
++
++        if (IsGeneratedStateBoundary(line))
++        {
++            FlushGeneratedStateWrites(output, writes);
++        }
++
++        output.append(line);
++        if (lineEnd != std::string::npos)
++        {
++            output += '\n';
+         }
++        CollectGeneratedStateWrites(line, writes);
+ 
+-        if (lineEnd == std::string_view::npos)
++        if (lineEnd == std::string::npos)
+         {
+             break;
+         }
+         lineStart = lineEnd + 1;
+     }
+-
+-    return false;
++    FlushGeneratedStateWrites(output, writes);
+ }
+ 
+ bool Recompiler::LoadConfig(const std::string_view& configFilePath)
+@@ -776,6 +1003,8 @@ bool Recompiler::Recompile(
+             }
+         };
+ 
++    println("\tPPC_SET_GUEST_IAR(0x{:X});", base);
++
+     if (midAsmHook != config.midAsmHooks.end() && !midAsmHook->second.afterInstruction)
+         printMidAsmHook();
+ 
+@@ -2601,11 +2830,7 @@ bool Recompiler::Recompile(
+     }
+ #endif
+ 
+-    if (GeneratedCodeWritesStackPointer(
+-            std::string_view(out).substr(instructionOutputStart)))
+-    {
+-        println("\tPPC_PUBLISH_STACK_POINTER();");
+-    }
++    InstrumentGeneratedStateUpdates(out, instructionOutputStart);
+ 
+     if (midAsmHook != config.midAsmHooks.end() && midAsmHook->second.afterInstruction)
+         printMidAsmHook();
+diff --git a/XenonUtils/ppc_context.h b/XenonUtils/ppc_context.h
+index 83c1757..aac2e98 100644
+--- a/XenonUtils/ppc_context.h
++++ b/XenonUtils/ppc_context.h
+@@ -532,6 +532,10 @@ struct PPCFPSCRRegister
+     }
+ };
+ 
++#ifndef PPC_CONTEXT_EXTENSION
++#define PPC_CONTEXT_EXTENSION
++#endif
++
+ struct alignas(0x40) PPCContext
+ {
+     PPCRegister r3;
+@@ -774,6 +778,7 @@ struct alignas(0x40) PPCContext
+     PPCVRegister v126;
+     PPCVRegister v127;
+ #endif
++    PPC_CONTEXT_EXTENSION
+ };
+ 
+ inline uint8_t VectorMaskL[] =
+@@ -940,4 +945,48 @@ inline uint64_t __rdtsc()
+ #define PPC_PUBLISH_STACK_POINTER() ((void)0)
+ #endif
+ 
++#ifndef PPC_SET_GUEST_IAR
++#define PPC_SET_GUEST_IAR(address) ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_GPR
++#define PPC_PUBLISH_GPR(index) ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_FPR
++#define PPC_PUBLISH_FPR(index) ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_VECTOR
++#define PPC_PUBLISH_VECTOR(index) ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_CR
++#define PPC_PUBLISH_CR(index) ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_LR
++#define PPC_PUBLISH_LR() ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_CTR
++#define PPC_PUBLISH_CTR() ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_XER
++#define PPC_PUBLISH_XER() ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_FPSCR
++#define PPC_PUBLISH_FPSCR() ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_VSCR
++#define PPC_PUBLISH_VSCR() ((void)0)
++#endif
++
++#ifndef PPC_PUBLISH_MSR
++#define PPC_PUBLISH_MSR() ((void)0)
++#endif
++
+ #endif

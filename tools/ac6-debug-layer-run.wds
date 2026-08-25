@@ -1,0 +1,19 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi 0000087a
+sxi c000001d
+sxi c0000094
+sxd c0000005
+sxe c0000409
+sxe e0423603
+g
+.echo XEO3_AC6_DEBUG_LAYER_RUNTIME_FAILURE
+.lastevent
+.exr -1
+.ecxr
+r
+kv 200
+lm
+q

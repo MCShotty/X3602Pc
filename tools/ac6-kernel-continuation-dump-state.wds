@@ -1,0 +1,34 @@
+.ecxr
+.echo XEO3_AC6_KERNEL_CONTINUATION_DUMP_STATE
+r
+r @$t0=@rdi+0x80
+r @$t1=poi(@$t0-0x10)
+r @$t2=@$t1+(0x8005f0b4*2)
+r @$t3=@$t1+(0x80019c50*2)
+r @$t4=@$t1+(0x800392f4*2)
+.printf "cpu_state=%p guest_memory=%p dispatch_base=%p\n", @$t0, @r15, @$t1
+.printf "missing_slot=%p missing_target=%p\n", @$t2, poi(@$t2)
+.printf "worker_slot=%p worker_target=%p\n", @$t3, poi(@$t3)
+.printf "restore_slot=%p restore_target=%p\n", @$t4, poi(@$t4)
+.echo XEO3_AC6_DISPATCH_NEIGHBORS
+dq @$t2-0x40 L18
+dq @$t3-0x40 L18
+dq @$t4-0x40 L18
+.echo XEO3_AC6_CPU_STATE
+.printf "r1=%I64x r3=%I64x lr=%I64x ctr=%I64x msr=%I64x cr6=%08x\n", poi(@$t0+0x8), poi(@$t0), poi(@$t0-0x20), poi(@$t0-0x18), poi(@$t0+0x1f0), dwo(@$t0-0x28)
+.printf "r9=%I64x r11=%I64x r27=%I64x r28=%I64x r29=%I64x r30=%I64x r31=%I64x\n", poi(@$t0+0x40), poi(@$t0+0x50), poi(@$t0+0x100), poi(@$t0+0x60), poi(@$t0+0x68), poi(@$t0+0x70), poi(@$t0+0x78)
+dq @$t0-0x80 L60
+.echo XEO3_AC6_GUEST_CONTINUATION
+db @r15+0x8005f060 L110
+.echo XEO3_AC6_GUEST_WORKER
+db @r15+0x80019c50 L100
+.echo XEO3_AC6_GUEST_RESTORE
+db @r15+0x800392f4 L100
+.echo XEO3_AC6_GUEST_STACK
+.if (poi(@$t0+0x8) < 0x100000000) { db @r15+poi(@$t0+0x8)-0x100 L300 } .else { .echo INVALID_GUEST_STACK_POINTER }
+.echo XEO3_AC6_MODULES
+lm
+.echo XEO3_AC6_HOST_STACK
+kv 100
+.echo XEO3_AC6_KERNEL_CONTINUATION_DUMP_STATE_DONE
+q

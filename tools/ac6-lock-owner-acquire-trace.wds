@@ -1,0 +1,26 @@
+sxi e0000001
+sxi 40010006
+sxi 4001000a
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe c0000409
+sxe e0423603
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED_FOR_LOCK_OWNER_TRACE
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+ba w4 00000001826a1930 ".if (dwo(00000001826a1930) == 0x20600130) { .echo XEO3_AC6_LOCK_OWNER_30016020_ACQUIRED; .printf \"host_tid=%x cpu_state=%p guest_memory=%p r13=%08x current_thread_raw=%08x lock=%p\\n\", @$tid, @rbx, @r15, dwo(@rbx+0x90), dwo(@r15+dwo(@rbx+0x90)+0x100), 00000001826a1918; .echo XEO3_AC6_LOCK_STATE; db 00000001826a1918 L1c; .echo XEO3_AC6_CPU_STATE; dq (@rbx-80) L80; .echo XEO3_AC6_ACQUISITION_STACK; kv 100; ~* kv 40; .echo XEO3_AC6_LOCK_OWNER_TRACE_DONE; .detach; q } .else { gc }"
+g
+.echo XEO3_AC6_LOCK_OWNER_TRACE_FALLBACK
+.lastevent
+.exr -1
+r
+~* kv 100
+.echo XEO3_AC6_LOCK_OWNER_TRACE_FALLBACK_DONE
+.detach
+q

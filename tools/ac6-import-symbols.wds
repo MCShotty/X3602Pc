@@ -1,0 +1,14 @@
+sxi e0000001
+sxi 40080201
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+x xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!*RtlLeaveCriticalSection*
+x xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!*ExecuteImport*
+q

@@ -1,0 +1,20 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED_FOR_R31_RESTORE_TRACE
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_822CEAC0+0x848 ".if (dwo(@rdi+0xf8) != (dwo(@rdi+0xb8)-0xf6c)) { .echo XEO3_AC6_BAD_R31_AFTER_LITERAL_BUILDER; .printf \"translated_context=%p guest_base=%p guest_r1=%08x r3=%08x r23=%08x r31=%08x expected_r31=%08x saved_r31_slot=%p saved_r31=%p\n\", @rdi, @rsi, dwo(@rdi+0x10), dwo(@rdi), dwo(@rdi+0xb8), dwo(@rdi+0xf8), dwo(@rdi+0xb8)-0xf6c, @rsi+dwo(@rdi+0x10)-0x10, qwo(@rsi+dwo(@rdi+0x10)-0x10); .echo XEO3_AC6_TRANSLATED_CONTEXT; dq @rdi L40; .echo XEO3_AC6_CALLER_STACK_AROUND_SAVE_AREA; dq (@rsi+dwo(@rdi+0x10)-0x120) L40; .echo XEO3_AC6_R31_RESTORE_TRACE_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_R31_RESTORE_TRACE_FALLBACK
+.lastevent
+r
+kv 100
+q

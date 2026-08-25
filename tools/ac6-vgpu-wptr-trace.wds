@@ -1,0 +1,26 @@
+sxd e0000001
+sxd 40080201
+sxd 80000004
+sxe e0423603
+sxd c0000005
+sxd c000001d
+sxd c0000094
+sxe c0000409
+bu Emu+0x636c9 ".if (@edx == 0x714) { .echo XEO3_AC6_VGPU_WPTR_CALL } .else { gc }"
+g
+.echo XEO3_AC6_VGPU_WPTR_STOPPED
+r
+.printf "XEO3_AC6_VGPU_OBJECT object=%p vtable=%p method=%p offset=%x value=%x\n", @rcx, @rax, poi(@rax+0x80), @edx, @r8d
+r @$t0=poi(@rcx+0x10)
+r @$t1=poi(@$t0+8)
+r @$t2=poi(@$t1+0x24ae0)
+r @$t3=poi(@$t1+0x24ae8)
+.printf "XEO3_AC6_VGPU_WPTR_CALLBACK gpu=%p current=%x callback=%p context=%p\n", @$t1, dwo(@$t1+0x2774), @$t2, @$t3
+dq @rax L20
+ln poi(@rax+0x80)
+u poi(@rax+0x80) L100
+ln @$t2
+u @$t2 L100
+kv 100
+.echo XEO3_AC6_VGPU_WPTR_DUMP_DONE
+q

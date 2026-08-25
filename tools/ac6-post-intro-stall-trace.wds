@@ -1,0 +1,35 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi 80000007
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxi e06d7363
+sxe c0000409
+sxe e0423603
+r @$t0=0
+r @$t6=0
+bu VGPUDX12+0x5bfe ".if (dwo(@rcx+0xa60) == 0x2000) { r @$t0=@rcx; gc } .else { gc }"
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_821E63F0 ".if (@$t6 < 120) { r @$t6=@$t6+1; gc } .else { .echo XEO3_AC6_POST_INTRO_CALLBACK_THRESHOLD }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_POST_INTRO_STALL_BREAK
+r @$t4=@rcx
+r @$t5=@rdx
+bc *
+.printf "XEO3_AC6_CALLBACK count=%x ctx=%p base=%p r3=%08x r4=%08x r5=%08x r6=%08x r7=%08x r8=%08x r9=%08x r10=%08x r11=%08x lr=%08x ctr=%08x\n", @$t6, @$t4, @$t5, dwo(@$t4), dwo(@$t4+0x20), dwo(@$t4+0x28), dwo(@$t4+0x30), dwo(@$t4+0x38), dwo(@$t4+0x40), dwo(@$t4+0x48), dwo(@$t4+0x50), dwo(@$t4+0x58), dwo(@$t4+0x100), dwo(@$t4+0x108)
+.echo XEO3_AC6_CALLBACK_CONTEXT
+dq @$t4 L40
+.echo XEO3_AC6_CALLBACK_OBJECT
+dd (@$t5+dwo(@$t4+0x20)) L200
+.if (@$t0 != 0) { r @$t1=poi(@$t0+0xa0); r @$t2=poi(VGPUDX12+0x5abcb0); r @$t3=@$t2+(dwo(@$t0+0xa64)&0x1fffffff); .printf "XEO3_AC6_VGPU_POST_INTRO state=%p registers=%p memory=%p ring=%p size=%x base=%x rptr=%x reg_rptr=%x wptr=%x pending_bytes=%x remaining=%x pointer=%p writeback_address=%x\n", @$t0, @$t1, @$t2, @$t3, dwo(@$t0+0xa60), dwo(@$t0+0xa64), dwo(@$t0+0xa74), dwo(@$t1+0x2770), dwo(@$t1+0x2774), dwo(@$t0+0x18), dwo(@$t0+0x1c), poi(@$t0+0x20), dwo(@$t0+0xa6c); dd @$t3 L80 } .else { .echo XEO3_AC6_VGPU_STATE_NOT_CAPTURED }
+~* kv 100
+lm
+.echo XEO3_AC6_POST_INTRO_STALL_DUMP_DONE
+q

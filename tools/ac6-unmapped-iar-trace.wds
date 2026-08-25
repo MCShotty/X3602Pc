@@ -1,0 +1,11 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi 80000007
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxi e06d7363
+bu Emu+0x5fe78 ".echo XEO3_AC6_UNMAPPED_IAR; r @$t0=@rdi+0x80; r @$t1=poi(@$t0-0x10); r @$t2=@$t1+(@rbx*2); .printf \"guest_iar=%08x cpu_state=%p guest_memory=%p host_rsp=%p tid=%x\\n\", @ebx, @$t0, @r15, @rsp, @$tid; .printf \"r1=%I64x r3=%I64x lr=%I64x ctr=%I64x msr=%I64x cr6=%08x\\n\", poi(@$t0+0x8), poi(@$t0), poi(@$t0-0x20), poi(@$t0-0x18), poi(@$t0+0x1f0), dwo(@$t0-0x28); .printf \"r9=%I64x r11=%I64x r27=%I64x r28=%I64x r29=%I64x r30=%I64x r31=%I64x\\n\", poi(@$t0+0x40), poi(@$t0+0x50), poi(@$t0+0x100), poi(@$t0+0x60), poi(@$t0+0x68), poi(@$t0+0x70), poi(@$t0+0x78); .printf \"dispatch_table=%p slot=%p slot_target=%p\\n\", @$t1, @$t2, poi(@$t2); !address @$t2; dq @$t2-0x20 L10; .reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll; .echo XEO3_AC6_BRIDGE_COUNTERS; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeDispatchCount L9; .echo XEO3_AC6_CPU_STATE; dq @$t0-0x80 L160; .echo XEO3_AC6_GUEST_STACK; .if (poi(@$t0+0x8) < 0x100000000) { db @r15+poi(@$t0+0x8)-0x100 L300 } .else { .echo INVALID_GUEST_STACK_POINTER }; .echo XEO3_AC6_HOST_STACK; dps @rsp L80; kv 100; .echo XEO3_AC6_UNMAPPED_IAR_TRACE_DONE; .detach; q"
+g

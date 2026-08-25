@@ -1,0 +1,65 @@
+# Proprietary game and Microsoft runtime inputs
+*.iso
+*.xex
+*.xbe
+*.god
+*.svod
+*.hvdata
+xboxkrnl*.bin
+Emu.exe
+
+# Native build products
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.obj
+*.o
+*.a
+*.dmp
+*.dxil
+*.wpix
+*.pix3
+
+# Generated/recompiled title code and local experiments
+/build/
+/build-*/
+/out/
+/generated/
+/artifacts/
+/captures/
+/dumps/
+/logs/
+/lab/
+/dvd/
+/game/
+/configs/ac6/private/
+/.tools/
+/.cache/
+/.codex-*
+/configs/ac6/.ac6-effective-*.toml
+/configs/ac6/.switch-tables-effective-*.toml
+/-c
+
+# XeO3/GDK runtime state
+Storage/
+XeO3_ShaderCache/
+ShaderCache/
+*.etl
+*.trace
+
+# IDE and CMake state
+.vs/
+.vscode/
+CMakeUserPresets.json
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# Python tooling
+.venv/
+__pycache__/
+*.py[cod]

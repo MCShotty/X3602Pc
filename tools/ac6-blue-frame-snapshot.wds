@@ -1,0 +1,39 @@
+sxi e0000001
+sxi 40080201
+sxi 80000004
+sxi 80000007
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxi e06d7363
+sxe 80000003
+sxe c0000409
+sxe e0423603
+r @$t0=0
+bu VGPUDX12+0x5bfe ".if (@$t0 == 0) { .if (dwo(@rcx+0xa60) == 0x2000) { .if (dwo(poi(@rcx+0xa0)+0x2774) != 0) { r @$t0=@rcx; .echo XEO3_AC6_BLUE_VGPU_STATE_CAPTURED; bc *; gc } .else { gc } } .else { gc } } .else { gc }"
+g
+.echo XEO3_AC6_BLUE_FRAME_SNAPSHOT_BREAK
+.lastevent
+.exr -1
+r
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo XEO3_AC6_BLUE_BRIDGE_COUNTERS
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeDispatchCount L1
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeImportCount L1
+dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeLastGuestIar L3
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVirtualPadPollCount L1
+dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVirtualPadLastButtons L1
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuExtendedFetchCount L1
+dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuLastFetchCount L2
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuVertexShaderCompileCount L1
+dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuLastVertexShaderSize L2
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuGroundFixShaderCount L2
+dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuGroundFixFailure L1
+.if (@$t0 != 0) { r @$t1=poi(@$t0+0xa0); r @$t2=poi(VGPUDX12+0x5abcb0); r @$t3=@$t2+(dwo(@$t0+0xa64)&0x1fffffff); r @$t4=dwo(@$t0+0xa74); r @$t5=dwo(@$t1+0x2774); .printf "XEO3_AC6_BLUE_VGPU state=%p registers=%p memory=%p ring=%p size=%x base=%x rptr=%x reg_rptr=%x wptr=%x pending_bytes=%x remaining=%x pointer=%p writeback_address=%x\n", @$t0, @$t1, @$t2, @$t3, dwo(@$t0+0xa60), dwo(@$t0+0xa64), @$t4, dwo(@$t1+0x2770), @$t5, dwo(@$t0+0x18), dwo(@$t0+0x1c), poi(@$t0+0x20), dwo(@$t0+0xa6c); .echo XEO3_AC6_BLUE_VGPU_REGISTERS; dd @$t1+0x2700 L40; .echo XEO3_AC6_BLUE_RING_START; dd @$t3 L80; .echo XEO3_AC6_BLUE_RING_AT_RPTR; dd @$t3+(@$t4*4)-80 L80; .echo XEO3_AC6_BLUE_RING_AT_WPTR; dd @$t3+(@$t5*4)-80 L80 } .else { .echo XEO3_AC6_BLUE_VGPU_STATE_NOT_CAPTURED }
+.echo XEO3_AC6_BLUE_ALL_REGISTERS
+~* r
+.echo XEO3_AC6_BLUE_ALL_STACKS
+~* kv 100
+lm
+.echo XEO3_AC6_BLUE_FRAME_SNAPSHOT_DONE
+q

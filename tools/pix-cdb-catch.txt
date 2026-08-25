@@ -1,0 +1,2 @@
+sxe -c ".echo CPP_EXCEPTION; .exr -1; kb; q" eh
+g

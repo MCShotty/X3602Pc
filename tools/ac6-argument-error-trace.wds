@@ -1,0 +1,4 @@
+sxd e0000001
+sxd 40080201
+bp Emu+0x2f110 ".printf \"LOG_FORMAT %ma\n\", @rcx; .printf \"LOG_ARGUMENT %ma\n\", @rdx; g"
+g

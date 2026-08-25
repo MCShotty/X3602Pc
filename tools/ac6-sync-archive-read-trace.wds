@@ -1,0 +1,21 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+ba w8 xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveReadCount
+ba w8 xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveReadFailureCount
+g
+.echo XEO3_AC6_SYNCHRONOUS_ARCHIVE_READ
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveReadCount L1
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveReadFailureCount L1
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveReadLastOffset L1
+dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeSynchronousArchiveReadLastIndex L6
+.echo XEO3_AC6_SYNCHRONOUS_ARCHIVE_READ_DONE
+.detach
+q

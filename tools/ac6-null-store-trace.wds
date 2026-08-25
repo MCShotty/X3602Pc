@@ -1,0 +1,13 @@
+sxi e0000001
+sxi 40080201
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bp xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_823DA020 ".if (dwo(@rcx+0x20) == 0) { .echo XEO3_AC6_NULL_OUTPUT_BREAK; r; dq @rcx L20; dd (@rdx+poi(@rcx+0x10)) L100; dd (@rdx+dwo(@rcx+0xf8)) L100; dd (@rdx+dwo(@rcx)) L80; kv 60; .echo XEO3_AC6_NULL_OUTPUT_DUMP_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g

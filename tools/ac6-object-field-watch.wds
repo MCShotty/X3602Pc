@@ -1,0 +1,28 @@
+sxd e0000001
+sxd 40010006
+sxd 4001000a
+sxd 40080201
+sxd 80000003
+sxd 80000004
+sxd 80000007
+sxd c000001d
+sxd c0000094
+sxd c0000409
+sxd e06d7363
+sxd c0000005
+.echo XEO3_AC6_FIELD52_BEFORE
+dd 00000001`b1ccc4e4 L1
+ba w4 00000001`b1ccc4e4 ".if (poi(00000001`b1ccc4e4) != 0) {gc}"
+.echo XEO3_AC6_FIELD52_WATCH_ARMED
+g
+.echo XEO3_AC6_FIELD52_ZERO_WRITE_HIT
+.lastevent
+r
+.echo XEO3_AC6_FIELD52_ZERO_WRITE_HOST_CODE
+u @rip-60 L60
+.echo XEO3_AC6_FIELD52_ZERO_WRITE_STACK
+kv 100
+.dump /m "D:\Games\AC6 shit\XeO3-AC6-lab\ProbeLogs\ac6-field52-zero-write.dmp"
+.echo XEO3_AC6_FIELD52_ZERO_WRITE_CAPTURE_END
+.detach
+q

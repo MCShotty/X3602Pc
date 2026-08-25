@@ -1,0 +1,14 @@
+LIBRARY
+EXPORTS
+    CleanupPrecompiledDll @1
+    InitPrecompiledDll @2
+    PrecompiledImportTable @3 DATA
+    PrecompiledPointers @4 DATA
+    ProbeHostInterface DATA
+    ProbeHostValue0 DATA
+    ProbeHostValue1 DATA
+    ProbeHostValue2 DATA
+    ProbeInvocationCount DATA
+    ProbeLastCpuState DATA
+    ProbeLastGuestIar DATA
+    ProbeLastGuestMemory DATA

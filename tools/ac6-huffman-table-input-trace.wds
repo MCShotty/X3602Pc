@@ -1,0 +1,21 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED_FOR_HUFFMAN_TABLE_INPUT_TRACE
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_822CE2B8 "r $t0=0; r $t1=0; r $t2=0; .for (r $t0=0; @$t0<(dwo(@rcx+0x20)&0xffff); r $t0=@$t0+1) { .if (@$t1==0) { .if (by(@rdx+dwo(@rcx)+0x2ac+2*@$t0)!=0) { r $t1=1; r $t2=@$t0 } .else { .if (by(@rdx+dwo(@rcx)+0x2ad+2*@$t0)>0xf) { r $t1=1; r $t2=@$t0 } } } }; .if (@$t1!=0) { .echo XEO3_AC6_FIRST_INVALID_HUFFMAN_TABLE_INPUT; .printf \"translated_context=%p guest_base=%p guest_r1=%08x owner=%08x count=%08x root_bits=%08x first_invalid_index=%x first_invalid_raw=%04x\n\", @rcx, @rdx, dwo(@rcx+0x10), dwo(@rcx), dwo(@rcx+0x20), dwo(@rcx+0x28), @$t2, wo(@rdx+dwo(@rcx)+0x2ac+2*@$t2); .echo XEO3_AC6_HUFFMAN_CODE_LENGTHS; dw (@rdx+dwo(@rcx)+0x2ac) L140; .echo XEO3_AC6_HUFFMAN_OWNER; db (@rdx+dwo(@rcx)) L900; .echo XEO3_AC6_TRANSLATED_CONTEXT; dq @rcx L80; kv 100; .echo XEO3_AC6_FIRST_INVALID_HUFFMAN_TABLE_INPUT_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_HUFFMAN_TABLE_INPUT_TRACE_FALLBACK
+.lastevent
+.exr -1
+r
+kv 100
+q

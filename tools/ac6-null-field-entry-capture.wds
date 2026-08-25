@@ -1,0 +1,26 @@
+sxd e0000001
+sxd 40010006
+sxd 4001000a
+sxd 40080201
+sxd 80000003
+sxd 80000004
+sxd 80000007
+sxd c000001d
+sxd c0000094
+sxd c0000409
+sxd e06d7363
+sxd c0000005
+bu /w "dwo(@rdx + (poi(@rcx + 0x18) & 0xffffffff) + 0x34) == 0" xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_822BF3F8
+.echo XEO3_AC6_NULL_FIELD_ENTRY_ARMED
+g
+.echo XEO3_AC6_NULL_FIELD_ENTRY_HIT
+.lastevent
+r
+.printf "ctx=%p base=%p r3=%p field52be=%08x\n", @rcx, @rdx, poi(@rcx + 0x18), dwo(@rdx + (poi(@rcx + 0x18) & 0xffffffff) + 0x34)
+.echo XEO3_AC6_NULL_FIELD_ENTRY_OBJECT
+dd @rdx + (poi(@rcx + 0x18) & 0xffffffff) L40
+.echo XEO3_AC6_NULL_FIELD_ENTRY_STACK
+kv 100
+.echo XEO3_AC6_NULL_FIELD_ENTRY_CAPTURE_END
+.detach
+q

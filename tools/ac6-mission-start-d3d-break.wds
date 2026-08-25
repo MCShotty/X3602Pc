@@ -1,0 +1,42 @@
+sxi e0000001
+sxi 40010006
+sxi 4001000a
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi 80000007
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxi e06d7363
+.echo XEO3_AC6_D3D_BREAK_ARMED
+bp KERNELBASE!RaiseException ".if (@rcx == 0x87a) { .echo XEO3_AC6_D3D_RAISE_ENTRY } .else { gc }"
+g
+.echo XEO3_AC6_D3D_RAISE_ARGUMENTS
+.printf "code=%08x flags=%08x count=%I64u args=%p\n", @rcx, @rdx, @r8, @r9
+dq @r9 L8
+r @$t0=poi(@r9+8)
+r @$t1=poi(@r9+0x10)
+.printf "argument_1=%p argument_2=%p\n", @$t0, @$t1
+.echo XEO3_AC6_D3D_ARGUMENT_1_BYTES
+db @$t0 L200
+.echo XEO3_AC6_D3D_ARGUMENT_1_ASCII
+da @$t0 L200
+.echo XEO3_AC6_D3D_ARGUMENT_1_UNICODE
+du @$t0 L100
+.if (@r8 > 2) { .echo XEO3_AC6_D3D_ARGUMENT_2_BYTES; db @$t1 L200; .echo XEO3_AC6_D3D_ARGUMENT_2_ASCII; da @$t1 L200; .echo XEO3_AC6_D3D_ARGUMENT_2_UNICODE; du @$t1 L100 }
+.echo XEO3_AC6_D3D_RAISE_STACK
+kv 100
+bc *
+sxe 87a
+g
+.echo XEO3_AC6_D3D_EXCEPTION_HIT
+.lastevent
+.exr -1
+.ecxr
+r
+kv 100
+.dump /m "D:\Games\AC6 shit\XeO3-AC6-lab\ProbeLogs\ac6-mission-start-87a.dmp"
+.echo XEO3_AC6_D3D_BREAK_CAPTURE_END
+.detach
+q

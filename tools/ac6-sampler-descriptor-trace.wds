@@ -1,0 +1,12 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxd c0000005
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f VGPUDX12.dll
+bp VGPUDX12+0x46667 ".if (dwo(@r8+0xc) == 0) { .echo XEO3_AC6_INVALID_SAMPLER_DESCRIPTOR; .printf \"tid=%x desc=%p filter=%x address_u=%x address_v=%x address_w=%x\n\", @$tid, @r8, dwo(@r8), dwo(@r8+4), dwo(@r8+8), dwo(@r8+0xc); dd @r8 Ld; r; kv 80; q } .else { gc }"
+g

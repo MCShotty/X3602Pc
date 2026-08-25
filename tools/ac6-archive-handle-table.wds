@@ -1,0 +1,8 @@
+.echo XEO3_AC6_ARCHIVE_HANDLE_TABLE
+r $t0 = 00000033268fee00
+r $t1 = dwo(@$t0 + 0xc0)
+.printf "ctx=%p r24=%08x r30=%08x r31=%08x lr=%08x\n", @$t0, @$t1, dwo(@$t0 + 0xf0), dwo(@$t0 + 0xf8), dwo(@$t0 + 0x100)
+db (0000000100000000 + @$t1) L40
+.echo XEO3_AC6_ARCHIVE_HANDLE_TABLE_DONE
+.detach
+q

@@ -1,0 +1,9 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+bu Emu+0x3b7b0 ".echo XEO3_AC6_FATAL_FORMATTED; .printf \"caller=%p format=%p message=%p\n\", poi(@rsp+0x428), poi(@rsp+0x430), @rsp+0x20; da @rsp+0x20; .echo XEO3_AC6_FATAL_REGISTERS; r; .echo XEO3_AC6_FATAL_STACK; dps @rsp L90; kv 100; .echo XEO3_AC6_FATAL_TRACE_DONE; q"
+g

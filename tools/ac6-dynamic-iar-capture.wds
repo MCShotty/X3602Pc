@@ -1,0 +1,11 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi 80000007
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxi e06d7363
+bu Emu+0x5fe78 ".if (@ebx == 0x8005f0b4) { .echo XEO3_AC6_DYNAMIC_IAR; r @$t0=@rdi+0x80; r @$t1=poi(@$t0-0x10); r @$t2=@$t1+(0x8005f0b4*2); r @$t3=poi(@$t0+0x8); r @$t4=poi(@$t0-0x20); r @$t5=@$t1+(0x80019c50*2); r @$t6=@$t1+(0x800392f4*2); .printf \"guest_iar=%08x cpu_state=%p guest_memory=%p host_rsp=%p tid=%x\\n\", @ebx, @$t0, @r15, @rsp, @$tid; .printf \"r1=%I64x r3=%I64x r9=%I64x r11=%I64x lr=%I64x ctr=%I64x cr6=%08x\\n\", poi(@$t0+0x8), poi(@$t0), poi(@$t0+0x40), poi(@$t0+0x50), poi(@$t0-0x20), poi(@$t0-0x18), dwo(@$t0-0x28); .printf \"r27=%I64x r28=%I64x r29=%I64x r30=%I64x r31=%I64x\\n\", poi(@$t0+0x100), poi(@$t0+0x60), poi(@$t0+0x68), poi(@$t0+0x70), poi(@$t0+0x78); .printf \"dispatch_table=%p missing_slot=%p missing_target=%p worker_slot=%p worker_target=%p restore_slot=%p restore_target=%p\\n\", @$t1, @$t2, poi(@$t2), @$t5, poi(@$t5), @$t6, poi(@$t6); .echo XEO3_AC6_DISPATCH_SLOT_MEMORY; !address @$t2; dq @$t2-0x20 L10; !address poi(@$t5); !address poi(@$t6); .echo XEO3_AC6_KERNEL_FUNCTION; db @r15+0x8005f060 L110; .echo XEO3_AC6_KERNEL_WORKER_PROLOGUE; db @r15+0x80019c50 L40; .echo XEO3_AC6_KERNEL_RESTORE_EPILOGUE; db @r15+0x800392f4 L20; .echo XEO3_AC6_CPU_STATE; dq @$t0-0x80 L160; .echo XEO3_AC6_GUEST_STACK; .if (@$t3 < 0x100000000) { db @r15+@$t3-0x200 L500 } .else { .echo INVALID_GUEST_STACK_POINTER }; .echo XEO3_AC6_LR_MEMORY; .if (@$t4 < 0x100000000) { db @r15+@$t4-0x40 L100 } .else { .echo INVALID_LR }; .echo XEO3_AC6_HOST_STACK; dps @rsp L100; kv 100; .echo XEO3_AC6_DYNAMIC_IAR_CAPTURE_DONE; .detach; q } .else { gc }"
+g

@@ -1,0 +1,9 @@
+.echo XEO3_AC6_READ_PROVIDER_TARGET
+r $t0 = 0x823f07a0
+r $t2 = 0000000100000000 + @$t0 + 0x10
+r $t1 = dwo(@$t2)
+.printf "provider_table=%08x read_target_raw_le=%08x\n", @$t0, @$t1
+db (0000000100000000 + @$t0) L40
+.echo XEO3_AC6_READ_PROVIDER_TARGET_DONE
+.detach
+q

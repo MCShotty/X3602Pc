@@ -1,0 +1,26 @@
+sxi e0000001
+sxi 40010006
+sxi 4001000a
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe c0000409
+sxe e0423603
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED_FOR_RTL_TRY_ENTER_TRACE
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!XeO3CallMappedGuest ".if (@r8d == 0x80072af8) { .if ((dwo(@rcx) == 0x826a1918) && (dwo(@rdx+dwo(@rcx)+0x18) == 0x20600130)) { r @$t0=@rcx; r @$t1=@rdx; r @$t2=dwo(@rcx); r @$t3=poi(@rcx-0x10); r @$t4=poi(@$t3+(@r8*2)); r @$t5=poi(@rsp); r @$t6=dwo(@rdx+dwo(@rcx+0x90)+0x100); .echo XEO3_AC6_RTL_TRY_ENTER_BEFORE; .printf \"cpu_state=%p guest_memory=%p lock=%08x current_thread_raw=%08x r13=%08x dispatch_base=%p native_target=%p return_address=%p state_iar=%08x\\n\", @$t0, @$t1, @$t2, @$t6, dwo(@$t0+0x90), @$t3, @$t4, @$t5, dwo(@$t0-8); .echo XEO3_AC6_RTL_TRY_ENTER_LOCK_BEFORE; db (@$t1+@$t2) L1c; .echo XEO3_AC6_RTL_TRY_ENTER_NATIVE_CODE; ln @$t4; u @$t4 L80; bp /1 @$t4 \".echo XEO3_AC6_RTL_TRY_ENTER_NATIVE_ENTRY; r; kv 40; gc\"; bp /1 @$t5 \".echo XEO3_AC6_RTL_TRY_ENTER_AFTER; .printf \\\"result=%08x lock=%08x current_thread_raw=%08x cpu_state=%p guest_memory=%p\\n\\\", dwo(@$t0), @$t2, @$t6, @$t0, @$t1; .echo XEO3_AC6_RTL_TRY_ENTER_LOCK_AFTER; db (@$t1+@$t2) L1c; .echo XEO3_AC6_RTL_TRY_ENTER_CPU_STATE; dq (@$t0-80) L80; ~* kv 40; .echo XEO3_AC6_RTL_TRY_ENTER_TRACE_DONE; .detach; q\"; gc } .else { gc } } .else { gc }"
+g
+.echo XEO3_AC6_RTL_TRY_ENTER_TRACE_FALLBACK
+.lastevent
+.exr -1
+r
+~* kv 100
+.echo XEO3_AC6_RTL_TRY_ENTER_TRACE_FALLBACK_DONE
+.detach
+q

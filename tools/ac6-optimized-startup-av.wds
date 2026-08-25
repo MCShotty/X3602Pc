@@ -1,0 +1,33 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxd c0000005
+sxi c000001d
+sxi c0000094
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo XEO3_AC6_OPTIMIZED_AOT_LOADED_ARMING_AV
+sxe c0000005
+g
+.echo XEO3_AC6_OPTIMIZED_STARTUP_ORIGINAL_AV
+.lastevent
+.exr -1
+.ecxr
+r
+u @rip-80 L140
+kv 160
+dps @rsp L100
+.echo XEO3_AC6_OPTIMIZED_STARTUP_AV_TELEMETRY
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeDispatchCount L2
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeImportCount L2
+dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeLastGuestIar L3
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeFatalIndirectCount L1
+dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeLastFatalIndirectTarget L9
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeKernelContinuationInstallCount L2
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeHostUnmappedIarCount L1
+dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeHostUnmappedIarLastIar L7
+lm m xeo3_5fb3687c_001748c4
+lm m xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6
+q

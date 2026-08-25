@@ -1,0 +1,11 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi 80000007
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxi e06d7363
+sxe -c ".echo XEO3_AC6_KERNEL_CONTINUATION_INSTALL_FAILURE; .reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll; .echo XEO3_AC6_KERNEL_CONTINUATION_COUNTERS; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeKernelContinuationInstallCount L1; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeKernelContinuationInstallFailureCount L1; dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeKernelContinuationLastFailure L1; dd xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeKernelContinuationFingerprintMask L1; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeKernelContinuationLastDispatchBase L1; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeKernelContinuationLastSlot L1; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeKernelContinuationLastOriginalTarget L1; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeKernelContinuationLastGuestMemory L1; r; kv 80; ~* kv 20; .echo XEO3_AC6_KERNEL_CONTINUATION_INSTALL_CAPTURE_DONE; .detach; q" c0000409
+g

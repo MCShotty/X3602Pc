@@ -1,0 +1,19 @@
+sxd e0000001
+sxd 40080201
+sxd 80000004
+sxd c000001d
+sxd c0000094
+sxe c0000409
+sxe e0423603
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!xeo3::MmioLoad32 ".if (@r8d == 0x7fc86544) { .echo XEO3_AC6_MMIO_LOAD_HIT } .else { gc }"
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no!xeo3::MmioLoad32 ".if (@r8d == 0x7fc86544) { .echo XEO3_AC6_MMIO_LOAD_HIT_NO } .else { gc }"
+g
+.echo XEO3_AC6_MMIO_LOAD_STOPPED
+.printf "XEO3_AC6_MMIO_LOAD_CALL address=%x ppc=%p memory=%p\n", @r8d, @rcx, @rdx
+bc *
+kv 100
+gu
+.printf "XEO3_AC6_MMIO_LOAD_RETURN address=7fc86544 value=%x\n", @eax
+kv 100
+.echo XEO3_AC6_MMIO_LOAD_DUMP_DONE
+q

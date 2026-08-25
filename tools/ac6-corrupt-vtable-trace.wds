@@ -1,0 +1,20 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED_FOR_CORRUPT_VTABLE_TRACE
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bp xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x14671ce ".if ((@eax & 3) != 0) { .echo XEO3_AC6_UNALIGNED_VTABLE_LOAD; .printf \"rip=%p ctx=%p base=%p ea=%08x r1=%08x r3=%08x r11=%08x r28=%08x r29=%08x r30=%08x r31=%08x lr=%08x ctr=%08x\n\", @rip, @rdi, @rsi, @eax, dwo(@rdi+0x08), dwo(@rdi+0x18), dwo(@rdi+0x58), dwo(@rdi+0xe0), dwo(@rdi+0xe8), dwo(@rdi+0xf0), dwo(@rdi+0xf8), dwo(@rdi+0x100), dwo(@rdi+0x108); .echo XEO3_AC6_PPC_CONTEXT; dq @rdi L24; .echo XEO3_AC6_LIST_NODE; db (@rsi+dwo(@rdi+0xf8)) L40; .echo XEO3_AC6_OBJECT; db (@rsi+dwo(@rdi+0x18)) L40; .echo XEO3_AC6_NATIVE_STACK; kv 100; .echo XEO3_AC6_UNALIGNED_VTABLE_TRACE_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_CORRUPT_VTABLE_TRACE_FALLBACK
+.exr -1
+r
+kv 100
+q

@@ -1,0 +1,33 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxd c0000005
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+sxd c0000005
+g
+.echo XEO3_AC6_VGPU_NULL_OUTPUT_CRASH
+.lastevent
+.exr -1
+r
+.printf "fault=%p vgpu_rva=%p hr=%08x rcx=%p rbp=%p object=%p device=%p heap=%p output_slot=%p output=%p initial_layout=%08x tid=%x\n", @rip, @rip-VGPUDX12, @eax, @rcx, @rbp, @rbx, poi(@rbx+8), poi(@rbx+0x10), @rbp-0x40, poi(@rbp-0x40), @esi, @$tid
+.echo XEO3_AC6_VGPU_CALL_LOCALS
+dq @rbp-0x80 L20
+.echo XEO3_AC6_VGPU_OBJECT
+dq @rbx L10
+.echo XEO3_AC6_PATCH_COUNTERS_PRIMARY
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuPatchStatus L16
+.printf "last_placed_failure=%08x legacy_fallback_count=%I64x legacy_fallback_failure=%08x\n", dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuLastPlacedResourceFailure), qwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuLegacyFallbackCount), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuLegacyFallbackFailure)
+.echo XEO3_AC6_PATCH_COUNTERS_NO
+dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no!BridgeVgpuPatchStatus L16
+.printf "no_last_placed_failure=%08x no_legacy_fallback_count=%I64x no_legacy_fallback_failure=%08x\n", dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no!BridgeVgpuLastPlacedResourceFailure), qwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no!BridgeVgpuLegacyFallbackCount), dwo(xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6_no!BridgeVgpuLegacyFallbackFailure)
+.echo XEO3_AC6_VGPU_CRASH_STACK
+kv 100
+.echo XEO3_AC6_ALL_STACKS
+~* kv 40
+.echo XEO3_AC6_VGPU_NULL_OUTPUT_CRASH_DONE
+q

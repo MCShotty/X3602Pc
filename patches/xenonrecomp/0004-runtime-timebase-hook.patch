@@ -1,0 +1,26 @@
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index d089fd5..0dc1ed2 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -1500,7 +1500,7 @@ void Recompiler::PPCRecompile(const PPCFunc& func, std::string_view name)
+         break;
+ 
+     case PPC_INST_MFTB:
+-        println("\t{}.u64 = __rdtsc();", r(insn.operands[0]));
++        println("\t{}.u64 = PPC_READ_TIME_BASE();", r(insn.operands[0]));
+         break;
+ 
+     case PPC_INST_MR:
+diff --git a/XenonUtils/ppc_context.h b/XenonUtils/ppc_context.h
+index d2904a5..87f367a 100644
+--- a/XenonUtils/ppc_context.h
++++ b/XenonUtils/ppc_context.h
+@@ -932,4 +932,8 @@ inline uint64_t __rdtsc()
+ #   error "Missing implementation for __rdtsc()"
+ #endif
+ 
++#ifndef PPC_READ_TIME_BASE
++#define PPC_READ_TIME_BASE() __rdtsc()
++#endif
++
+ #endif

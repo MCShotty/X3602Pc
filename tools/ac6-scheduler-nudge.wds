@@ -1,0 +1,12 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi 80000007
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxi e06d7363
+.echo XEO3_AC6_SCHEDULER_NUDGE
+.detach
+q

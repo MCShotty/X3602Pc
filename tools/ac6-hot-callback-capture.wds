@@ -1,0 +1,33 @@
+sxi e0000001
+sxi 40010006
+sxi 4001000a
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi 80000007
+sxi c0000005
+sxi c000001d
+sxi c0000094
+sxi e06d7363
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo XEO3_AC6_HOT_CALLBACK_ARMED
+bu /1 xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_823B7CE0
+g
+.echo XEO3_AC6_HOT_CALLBACK_HIT
+r @$t0=@rcx
+r @$t1=@rdx
+r @$t2=dwo(@$t0+0x90)
+r @$t3=dwo(@$t0+0x20)
+.printf "CALLBACK ctx=%p guest_memory=%p r3=%08x r4=%08x r5=%08x r6=%08x r7=%08x r8=%08x r9=%08x r10=%08x r11=%08x r13=%08x guest_tid=%08x lr=%08x ctr=%08x\n", @$t0, @$t1, dwo(@$t0), @$t3, dwo(@$t0+0x28), dwo(@$t0+0x30), dwo(@$t0+0x38), dwo(@$t0+0x40), dwo(@$t0+0x48), dwo(@$t0+0x50), dwo(@$t0+0x58), @$t2, dwo(@$t1+@$t2+0x100), dwo(@$t0+0x100), dwo(@$t0+0x108)
+.echo XEO3_AC6_TARGET_CRITICAL_SECTION
+db (@$t1+0x826a1918) L1c
+.echo XEO3_AC6_CALLBACK_CONTEXT
+dq @$t0 L40
+.echo XEO3_AC6_CALLBACK_OBJECT
+dd (@$t1+@$t3) L80
+.echo XEO3_AC6_CALLBACK_HOST_STACK
+kv 40
+!runaway 3
+.echo XEO3_AC6_HOT_CALLBACK_CAPTURE_END
+.detach
+q

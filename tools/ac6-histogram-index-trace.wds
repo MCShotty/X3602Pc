@@ -1,0 +1,14 @@
+sxi e0000001
+sxi 40080201
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bp xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6+0x16e0ada ".if (qwo(@rdi+0x58) > 0xf) { .echo XEO3_AC6_BAD_HISTOGRAM_INDEX; .printf \"host_base=%p ctx=%p effective_guest=%08x index=%04x stack=%08x input=%08x cursor=%08x count=%08x min=%08x max=%08x owner=%08x\\n\", @rsi, @rdi, @eax, wo(@rdi+0x58), dwo(@rdi+0x10), dwo(@rdi+0xf8)+0x2ac, dwo(@rdi+0x38), dwo(@rdi+0xe8), dwo(@rdi+0xe0), dwo(@rdi+0xf0), dwo(@rdi+0xf8); r; dq @rdi L40; .echo XEO3_AC6_INPUT_VALUES; dw (@rsi+dwo(@rdi+0xf8)+0x2ac) L100; .echo XEO3_AC6_INPUT_CURSOR; dw (@rsi+dwo(@rdi+0x38)-0x20) L40; .echo XEO3_AC6_OWNER; dd (@rsi+dwo(@rdi+0xf8)) L100; kv 100; .echo XEO3_AC6_BAD_HISTOGRAM_INDEX_DUMP_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g

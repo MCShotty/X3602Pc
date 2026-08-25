@@ -1,0 +1,22 @@
+sxd e0000001
+sxd 40080201
+sxd 80000003
+sxd 80000004
+sxd c0000005
+sxd c000001d
+sxd c0000094
+sxe c0000409
+sxe e0423603
+g
+.echo XEO3_AC6_VGPU_NULL_FAILURE
+.lastevent
+.exr -1
+.ecxr
+r
+u @rip-40 L80
+kv 200
+.dump /ma C:\Users\CaptainMcShotgun\Documents\x3602Pc\out\ac6\Emu-18738-vgpu-null.dmp
+~* kv 100
+lm
+.echo XEO3_AC6_VGPU_NULL_DUMP_DONE
+q

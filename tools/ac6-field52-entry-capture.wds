@@ -1,0 +1,26 @@
+sxd e0000001
+sxd 40010006
+sxd 4001000a
+sxd 40080201
+sxd 80000003
+sxd 80000004
+sxd 80000007
+sxd c000001d
+sxd c0000094
+sxd c0000409
+sxd e06d7363
+sxi c0000005
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_822BF758
+g
+.echo XEO3_AC6_FIELD52_OBJECT_ENTRY
+.lastevent
+.printf "ctx=%p base=%p object=%p r2=%p\n", @rcx, @rdx, poi(@rcx), poi(@rcx + 0x18)
+r
+r @$t0 = @rdx + poi(@rcx)
+dd @$t0 L40
+dq @rcx L20
+kv 200
+dps @rsp L60
+~* kv 80
+.echo XEO3_AC6_FIELD52_OBJECT_ENTRY_END
+q

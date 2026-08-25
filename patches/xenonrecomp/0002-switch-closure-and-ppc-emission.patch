@@ -1,0 +1,478 @@
+diff --git a/XenonRecomp/recompiler.cpp b/XenonRecomp/recompiler.cpp
+index fa91527..00b9c5a 100644
+--- a/XenonRecomp/recompiler.cpp
++++ b/XenonRecomp/recompiler.cpp
+@@ -95,6 +95,47 @@ bool Recompiler::LoadConfig(const std::string_view& configFilePath)
+ 
+ void Recompiler::Analyse()
+ {
++    Function::IndirectBranchTargets indirectBranchTargets;
++    for (const auto& [switchBase, switchTable] : config.switchTables)
++    {
++        auto section = image.sections.begin();
++        for (; section != image.sections.end(); ++section)
++        {
++            if (switchBase >= section->base &&
++                switchBase < section->base + section->size)
++            {
++                break;
++            }
++        }
++        if (section == image.sections.end() ||
++            !(section->flags & SectionFlags_Code))
++        {
++            fmt::println(
++                "ERROR: Switch table at {:X} is outside an executable section",
++                switchBase);
++            continue;
++        }
++
++        const auto scanEnd = (std::min)(
++            section->base + section->size,
++            static_cast<size_t>(switchBase) + 0x80);
++        for (size_t address = switchBase; address + 4 <= scanEnd; address += 4)
++        {
++            const auto instruction =
++                ByteSwap(*static_cast<const uint32_t*>(image.Find(address)));
++            if (PPC_OP(instruction) != PPC_OP_CTR ||
++                PPC_XOP(instruction) != 528 ||
++                PPC_BL(instruction))
++            {
++                continue;
++            }
++
++            auto& targets = indirectBranchTargets[address];
++            targets.assign(switchTable.labels.begin(), switchTable.labels.end());
++            break;
++        }
++    }
++
+     for (size_t i = 14; i < 128; i++)
+     {
+         if (i < 32)
+@@ -183,12 +224,47 @@ void Recompiler::Analyse()
+         fn.BeginAddress = ByteSwap(fn.BeginAddress);
+         fn.Data = ByteSwap(fn.Data);
+ 
+-        if (image.symbols.find(fn.BeginAddress) == image.symbols.end())
++        const auto existingSymbol = image.symbols.find(fn.BeginAddress);
++        if (existingSymbol == image.symbols.end() ||
++            existingSymbol->address != fn.BeginAddress ||
++            existingSymbol->type != Symbol_Function)
+         {
+             auto& f = functions.emplace_back();
+             f.base = fn.BeginAddress;
+             f.size = fn.FunctionLength * 4;
+ 
++            const auto switchInFunction = std::find_if(
++                indirectBranchTargets.begin(),
++                indirectBranchTargets.end(),
++                [&f](const auto& entry)
++                {
++                    return entry.first >= f.base &&
++                        entry.first < f.base + f.size;
++                });
++            if (switchInFunction != indirectBranchTargets.end())
++            {
++                const auto section = std::find_if(
++                    image.sections.begin(),
++                    image.sections.end(),
++                    [&f](const Section& candidate)
++                    {
++                        return f.base >= candidate.base &&
++                            f.base < candidate.base + candidate.size;
++                    });
++                if (section != image.sections.end())
++                {
++                    const auto analyzed = Function::Analyze(
++                        image.Find(f.base),
++                        section->base + section->size - f.base,
++                        f.base,
++                        &indirectBranchTargets);
++                    if (analyzed.size > f.size)
++                    {
++                        f = analyzed;
++                    }
++                }
++            }
++
+             image.symbols.emplace(fmt::format("sub_{:X}", f.base), f.base, f.size, Symbol_Function);
+         }
+     }
+@@ -210,10 +286,19 @@ void Recompiler::Analyse()
+             {
+                 size_t address = base + (data - section.data) + PPC_BI(insn);
+ 
+-                if (address >= section.base && address < section.base + section.size && image.symbols.find(address) == image.symbols.end())
++                const auto existingSymbol = image.symbols.find(address);
++                if (address >= section.base &&
++                    address < section.base + section.size &&
++                    (existingSymbol == image.symbols.end() ||
++                     existingSymbol->address != address ||
++                     existingSymbol->type != Symbol_Function))
+                 {
+                     auto data = section.data + address - section.base;
+-                    auto& fn = functions.emplace_back(Function::Analyze(data, section.base + section.size - address, address));
++                    auto& fn = functions.emplace_back(Function::Analyze(
++                        data,
++                        section.base + section.size - address,
++                        address,
++                        &indirectBranchTargets));
+                     image.symbols.emplace(fmt::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
+                 }
+             }
+@@ -242,7 +327,11 @@ void Recompiler::Analyse()
+             }
+             else
+             {
+-                auto& fn = functions.emplace_back(Function::Analyze(data, dataEnd - data, base));
++                auto& fn = functions.emplace_back(Function::Analyze(
++                    data,
++                    dataEnd - data,
++                    base,
++                    &indirectBranchTargets));
+                 image.symbols.emplace(fmt::format("sub_{:X}", fn.base), fn.base, fn.size, Symbol_Function);
+ 
+                 base += fn.size;
+@@ -251,6 +340,108 @@ void Recompiler::Analyse()
+         }
+     }
+ 
++    // Direct tail branches and cross-fragment conditional branches can target
++    // an address inside another unwind range. Emit an entry point at every
++    // external target so recompilation never silently drops the transfer.
++    for (size_t functionIndex = 0; functionIndex < functions.size(); ++functionIndex)
++    {
++        const auto fn = functions[functionIndex];
++        for (size_t address = fn.base; address < fn.base + fn.size; address += 4)
++        {
++            if (!fn.blocks.empty() &&
++                fn.SearchBlock(address) == static_cast<size_t>(-1))
++            {
++                continue;
++            }
++
++            const auto instruction =
++                ByteSwap(*static_cast<const uint32_t*>(image.Find(address)));
++            if (PPC_BL(instruction))
++            {
++                continue;
++            }
++
++            std::vector<size_t> targets;
++            const auto op = PPC_OP(instruction);
++            if (op == PPC_OP_B)
++            {
++                targets.emplace_back(address + PPC_BI(instruction));
++            }
++            else if (op == PPC_OP_BC)
++            {
++                targets.emplace_back(address + PPC_BD(instruction));
++            }
++            else if (op == PPC_OP_CTR && PPC_XOP(instruction) == 528)
++            {
++                const auto indirectTargets = indirectBranchTargets.find(address);
++                if (indirectTargets != indirectBranchTargets.end())
++                {
++                    targets = indirectTargets->second;
++                }
++            }
++            else
++            {
++                continue;
++            }
++
++            for (const auto target : targets)
++            {
++                const bool targetIsInternal = fn.blocks.empty()
++                    ? target >= fn.base && target < fn.base + fn.size
++                    : fn.SearchBlock(target) != static_cast<size_t>(-1);
++                if (targetIsInternal)
++                {
++                    continue;
++                }
++
++                const auto existingTarget = image.symbols.find(target);
++                if (existingTarget != image.symbols.end() &&
++                    existingTarget->address == target &&
++                    existingTarget->type == Symbol_Function)
++                {
++                    continue;
++                }
++
++                const auto targetSection = std::find_if(
++                    image.sections.begin(),
++                    image.sections.end(),
++                    [target](const Section& candidate)
++                    {
++                        return (candidate.flags & SectionFlags_Code) &&
++                            target >= candidate.base &&
++                            target < candidate.base + candidate.size;
++                    });
++                if (targetSection == image.sections.end())
++                {
++                    fmt::println(
++                        "ERROR: External branch target {:X} is outside executable sections",
++                        target);
++                    continue;
++                }
++
++                auto targetFunction = Function::Analyze(
++                    image.Find(target),
++                    targetSection->base + targetSection->size - target,
++                    target,
++                    &indirectBranchTargets);
++                if (targetFunction.size == 0)
++                {
++                    fmt::println(
++                        "ERROR: External branch target {:X} produced an empty function",
++                        target);
++                    continue;
++                }
++
++                functions.emplace_back(std::move(targetFunction));
++                image.symbols.emplace(
++                    fmt::format("sub_{:X}", target),
++                    target,
++                    functions.back().size,
++                    Symbol_Function);
++            }
++        }
++    }
++
+     std::sort(functions.begin(), functions.end(), [](auto& lhs, auto& rhs) { return lhs.base < rhs.base; });
+ }
+ 
+@@ -363,6 +554,24 @@ bool Recompiler::Recompile(
+             return "ea";
+         };
+ 
++    const auto isAddressInFunction = [&fn, this](const size_t address)
++        {
++            const auto exactTarget = image.symbols.find(address);
++            if (address != fn.base &&
++                exactTarget != image.symbols.end() &&
++                exactTarget->address == address &&
++                exactTarget->type == Symbol_Function)
++            {
++                return false;
++            }
++
++            if (fn.blocks.empty())
++            {
++                return address >= fn.base && address < fn.base + fn.size;
++            }
++            return fn.SearchBlock(address) != static_cast<size_t>(-1);
++        };
++
+     // TODO (Sajid): Check for out of bounds access
+     auto mmioStore = [&]() -> bool
+         {
+@@ -406,7 +615,7 @@ bool Recompiler::Recompile(
+ 
+     auto printConditionalBranch = [&](bool not_, const std::string_view& cond)
+         {
+-            if (insn.operands[1] < fn.base || insn.operands[1] >= fn.base + fn.size)
++            if (!isAddressInFunction(insn.operands[1]))
+             {
+                 println("\tif ({}{}.{}) {{", not_ ? "!" : "", cr(insn.operands[0]), cond);
+                 print("\t");
+@@ -595,7 +804,7 @@ bool Recompiler::Recompile(
+         break;
+ 
+     case PPC_INST_B:
+-        if (insn.operands[0] < fn.base || insn.operands[0] >= fn.base + fn.size)
++        if (!isAddressInFunction(insn.operands[0]))
+         {
+             printFunctionCall(insn.operands[0]);
+             println("\treturn;");
+@@ -615,10 +824,24 @@ bool Recompiler::Recompile(
+             {
+                 println("\tcase {}:", i);
+                 auto label = switchTable->second.labels[i];
+-                if (label < fn.base || label >= fn.base + fn.size)
++                if (!isAddressInFunction(label))
+                 {
+-                    println("\t\t// ERROR: 0x{:X}", label);
+-                    fmt::println("ERROR: Switch case at {:X} is trying to jump outside function: {:X}", base, label);
++                    const auto targetSymbol = image.symbols.find(label);
++                    if (targetSymbol == image.symbols.end() ||
++                        targetSymbol->address != label ||
++                        targetSymbol->type != Symbol_Function)
++                    {
++                        println("\t\t// ERROR: 0x{:X}", label);
++                        fmt::println(
++                            "ERROR: Switch case at {:X} has no external target function: {:X}",
++                            base,
++                            label);
++                    }
++                    else
++                    {
++                        print("\t");
++                        printFunctionCall(label);
++                    }
+                     println("\t\treturn;");
+                 }
+                 else
+@@ -712,7 +935,11 @@ bool Recompiler::Recompile(
+         break;
+ 
+     case PPC_INST_BLRL:
+-        println("__builtin_debugtrap();");
++        println("\t{}.u32 = uint32_t(ctx.lr);", temp());
++        if (!config.skipLr)
++            println("\tctx.lr = 0x{:X};", base + 4);
++        println("\tPPC_CALL_INDIRECT_FUNC({}.u32);", temp());
++        csrState = CSRState::Unknown; // the call could change it
+         break;
+ 
+     case PPC_INST_BLT:
+@@ -801,6 +1028,7 @@ bool Recompiler::Recompile(
+         break;
+ 
+     case PPC_INST_DCBF:
++    case PPC_INST_DCBST:
+         // no op
+         break;
+ 
+@@ -985,6 +1213,11 @@ bool Recompiler::Recompile(
+         println("\t{}.f64 = float(1.0 / {}.f64);", f(insn.operands[0]), f(insn.operands[1]));
+         break;
+ 
++    case PPC_INST_FRSQRTE:
++        printSetFlushMode(false);
++        println("\t{}.f64 = 1.0 / sqrt({}.f64);", f(insn.operands[0]), f(insn.operands[1]));
++        break;
++
+     case PPC_INST_FRSP:
+         printSetFlushMode(false);
+         println("\t{}.f64 = double(float({}.f64));", f(insn.operands[0]), f(insn.operands[1]));
+@@ -1125,6 +1358,13 @@ bool Recompiler::Recompile(
+         println("{}.u32);", r(insn.operands[2]));
+         break;
+ 
++    case PPC_INST_LHBRX:
++        print("\t{}.u64 = __builtin_bswap16(PPC_LOAD_U16(", r(insn.operands[0]));
++        if (insn.operands[1] != 0)
++            print("{}.u32 + ", r(insn.operands[1]));
++        println("{}.u32));", r(insn.operands[2]));
++        break;
++
+     case PPC_INST_LI:
+         println("\t{}.s64 = {};", r(insn.operands[0]), int32_t(insn.operands[1]));
+         break;
+@@ -1311,6 +1551,12 @@ bool Recompiler::Recompile(
+             println("\t{}.compare<int32_t>({}.s32, 0, {});", cr(0), r(insn.operands[0]), xer());
+         break;
+ 
++    case PPC_INST_MULHDU:
++        println("\t{}.u64 = PPC_MULHDU({}.u64, {}.u64);", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
++        if (strchr(insn.opcode->name, '.'))
++            println("\t{}.compare<int64_t>({}.s64, 0, {});", cr(0), r(insn.operands[0]), xer());
++        break;
++
+     case PPC_INST_MULLD:
+         println("\t{}.s64 = {}.s64 * {}.s64;", r(insn.operands[0]), r(insn.operands[1]), r(insn.operands[2]));
+         break;
+@@ -1769,8 +2015,9 @@ bool Recompiler::Recompile(
+         println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_and_si128(simde_mm_load_si128((simde__m128i*){}.u8), simde_mm_load_si128((simde__m128i*){}.u8)));", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
+         break;
+ 
++    case PPC_INST_VANDC:
+     case PPC_INST_VANDC128:
+-        println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_andnot_si128(simde_mm_load_si128((simde__m128i*){}.u8), simde_mm_load_si128((simde__m128i*){}.u8)));", v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
++        println("\tPPC_VANDC({}, {}, {});", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
+         break;
+ 
+     case PPC_INST_VAVGSB:
+@@ -1831,7 +2078,10 @@ bool Recompiler::Recompile(
+ 
+     case PPC_INST_VCMPBFP:
+     case PPC_INST_VCMPBFP128:
+-        println("\t__builtin_debugtrap();");
++        if (strchr(insn.opcode->name, '.'))
++            println("\tPPC_VCMPBFP({}, {}, {}, &{});", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]), cr(6));
++        else
++            println("\tPPC_VCMPBFP({}, {}, {}, nullptr);", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
+         break;
+ 
+     case PPC_INST_VCMPEQFP:
+@@ -2014,6 +2264,17 @@ bool Recompiler::Recompile(
+             println("\t{}.u32[{}] = {}.u32;", v(insn.operands[0]), insn.operands[4], temp());
+             break;
+ 
++        case 3: // float16_2
++            if (insn.operands[3] != 1 || insn.operands[4] > 3)
++            {
++                fmt::println("Unexpected float16_2 pack instruction at {:X}", base);
++            }
++            else
++            {
++                println("\tPPC_VPKD3D_FLOAT16_2({}, {}, {});", v(insn.operands[0]), v(insn.operands[1]), insn.operands[4]);
++            }
++            break;
++
+         case 5: // float16_4
+             if (insn.operands[3] != 2 || insn.operands[4] > 2)
+                 fmt::println("Unexpected float16_4 pack instruction at {:X}", base);
+@@ -2047,6 +2308,11 @@ bool Recompiler::Recompile(
+         println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_packus_epi16(simde_mm_load_si128((simde__m128i*){}.s16), simde_mm_load_si128((simde__m128i*){}.s16)));", v(insn.operands[0]), v(insn.operands[2]), v(insn.operands[1]));
+         break;
+ 
++    case PPC_INST_VPKSWSS:
++    case PPC_INST_VPKSWSS128:
++        println("\tPPC_VPKSWSS({}, {}, {}, ctx.vscr);", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]));
++        break;
++
+     case PPC_INST_VREFP:
+     case PPC_INST_VREFP128:
+         // TODO: see if we can use rcp safely
+@@ -2088,7 +2354,8 @@ bool Recompiler::Recompile(
+         break;
+ 
+     case PPC_INST_VSEL:
+-        println("\tsimde_mm_store_si128((simde__m128i*){}.u8, simde_mm_or_si128(simde_mm_andnot_si128(simde_mm_load_si128((simde__m128i*){}.u8), simde_mm_load_si128((simde__m128i*){}.u8)), simde_mm_and_si128(simde_mm_load_si128((simde__m128i*){}.u8), simde_mm_load_si128((simde__m128i*){}.u8))));", v(insn.operands[0]), v(insn.operands[3]), v(insn.operands[1]), v(insn.operands[3]), v(insn.operands[2]));
++    case PPC_INST_VSEL128:
++        println("\tPPC_VSEL({}, {}, {}, {});", v(insn.operands[0]), v(insn.operands[1]), v(insn.operands[2]), v(insn.operands[3]));
+         break;
+ 
+     case PPC_INST_VSLB:
+@@ -2212,6 +2479,10 @@ bool Recompiler::Recompile(
+             println("\t{} = {};", v(insn.operands[0]), vTemp());
+             break;
+ 
++        case 5: // float16_4
++            println("\tPPC_VUPKD3D_FLOAT16_4({}, {});", v(insn.operands[0]), v(insn.operands[1]));
++            break;
++
+         default:
+             println("\t__builtin_debugtrap();");
+             break;
+@@ -2293,6 +2564,12 @@ bool Recompiler::Recompile(const Function& fn)
+ 
+     for (size_t addr = base; addr < end; addr += 4)
+     {
++        if (!fn.blocks.empty() &&
++            fn.SearchBlock(addr) == static_cast<size_t>(-1))
++        {
++            continue;
++        }
++
+         const uint32_t instruction = ByteSwap(*(uint32_t*)((char*)data + addr - base));
+         if (!PPC_BL(instruction))
+         {
+@@ -2401,6 +2678,14 @@ bool Recompiler::Recompile(const Function& fn)
+     ppc_insn insn;
+     while (base < end)
+     {
++        if (!fn.blocks.empty() &&
++            fn.SearchBlock(base) == static_cast<size_t>(-1))
++        {
++            base += 4;
++            ++data;
++            continue;
++        }
++
+         if (labels.find(base) != labels.end())
+         {
+             println("loc_{:X}:", base);

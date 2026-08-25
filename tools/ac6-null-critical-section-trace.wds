@@ -1,0 +1,22 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+sxe c0000409
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_AOT_MODULE_LOADED
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__RtlLeaveCriticalSection ".if (dwo(@rcx) == 0) { .echo XEO3_AC6_NULL_CRITICAL_SECTION; .printf \"ctx=%p base=%p r3=%08x r1=%08x r4=%08x r5=%08x r11=%08x r28=%08x r29=%08x r30=%08x r31=%08x lr=%08x ctr=%08x\\n\", @rcx, @rdx, dwo(@rcx), dwo(@rcx+0x10), dwo(@rcx+0x20), dwo(@rcx+0x28), dwo(@rcx+0x58), dwo(@rcx+0xe0), dwo(@rcx+0xe8), dwo(@rcx+0xf0), dwo(@rcx+0xf8), dwo(@rcx+0x100), dwo(@rcx+0x108); r; .echo XEO3_AC6_PPC_CONTEXT; dq @rcx L40; .echo XEO3_AC6_GUEST_STACK; dd (@rdx+dwo(@rcx+0x10)) L80; kv 100; .echo XEO3_AC6_NULL_CRITICAL_SECTION_DUMP_DONE; q } .else { gc }"
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_NULL_CRITICAL_SECTION_FALLBACK_BREAK
+.lastevent
+.exr -1
+r
+kv 100
+.echo XEO3_AC6_NULL_CRITICAL_SECTION_FALLBACK_DUMP_DONE
+q

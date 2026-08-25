@@ -1,0 +1,25 @@
+sxd e0000001
+sxd 40010006
+sxd 4001000a
+sxd 40080201
+sxd 80000003
+sxd 80000004
+sxd 80000007
+sxd c000001d
+sxd c0000094
+sxd c0000409
+sxd e06d7363
+sxi c0000005
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!__imp__sub_822BF758 ".echo XEO3_AC6_FIELD52_TARGET_ENTRY; r @$t1 = poi(@rcx); r @$t2 = @rdx; r @$t0 = @$t2 + @$t1 + 0x34; r @$t0; dd @$t0-0x34 L40; bc 0; ba w4 @$t0; gc"
+g
+.echo XEO3_AC6_FIELD52_WRITE_HIT
+.lastevent
+.printf "base=%p object=%08x field52host=%p field52be=%08x\n", @$t2, @$t1, @$t0, dwo(@$t0)
+r
+u @rip-60 L100
+kv 200
+dps @rsp L60
+dd @$t0-0x34 L40
+~* kv 80
+.echo XEO3_AC6_FIELD52_WRITE_CAPTURE_END
+q

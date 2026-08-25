@@ -1,0 +1,19 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxe c0000005
+sxe c000001d
+sxe c0000094
+sxe c0000096
+sxe c0000409
+sxd ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.echo XEO3_AC6_MEMORY_MAP_PROBE_READY
+bp Emu+0x5f460 ".if (@edx == 0xc0000005) { .echo XEO3_AC6_MEMORY_MAP_PROBE_HIT; .printf \"fault=%p physical=%p virtual=%p third=%p\\n\", poi(poi(@r8)+0x28), poi(Emu+0x1436d8), poi(Emu+0x143660), poi(Emu+0x143658); .echo CANDIDATE_PHYSICAL_MASK; db 0x11d810000 L1; .echo CANDIDATE_PHYSICAL_FULL; db 0x1bd810000 L1; .echo CANDIDATE_CURRENT; db 0x21d810000 L1; .echo CANDIDATE_VIRTUAL_PLUS; db 0x380140154 L1; .echo CANDIDATE_VIRTUAL_RAW; db 0x180140154 L1; .echo XEO3_AC6_MEMORY_MAP_PROBE_DONE; q } .else { gc }"
+g
+.echo XEO3_AC6_MEMORY_MAP_PROBE_FALLBACK
+.lastevent
+.exr -1
+r
+q

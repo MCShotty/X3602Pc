@@ -1,0 +1,13 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+.reload /f d3d12.dll
+.reload /f D3D12Core.dll
+.reload /f VGPUDX12.dll
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+ba e1 VGPUDX12+0x5a62e ".echo XEO3_AC6_DEVICE_REMOVED_REASON; .printf \"handler_result=%08x tid=%x\n\", @eax, @$tid; .echo XEO3_AC6_DRED_VERSIONED_DATA; dq D3D12Core!D3D12DeviceRemovedExtendedData L10; r @$t0=poi(D3D12Core!D3D12DeviceRemovedExtendedData+0x10); .if (@$t0 != 0) { .echo XEO3_AC6_DRED_FIRST_BREADCRUMB_NODE; dq @$t0 L10; .if (poi(@$t0) != 0) { da poi(@$t0); }; .if (poi(@$t0+0x8) != 0) { du poi(@$t0+0x8); }; .if (poi(@$t0+0x10) != 0) { da poi(@$t0+0x10); }; .if (poi(@$t0+0x18) != 0) { du poi(@$t0+0x18); }; .printf \"breadcrumb_count=%x completed=%x\n\", dwo(@$t0+0x30), dwo(poi(@$t0+0x38)); }; .echo XEO3_AC6_DRED_DONE; q"
+g

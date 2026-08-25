@@ -1,0 +1,14 @@
+sxi e0000001
+sxi 40080201
+sxi 80000003
+sxi 80000004
+sxi c000001d
+sxi c0000094
+sxi c0000005
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+bu xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!CleanupPrecompiledDll ".echo XEO3_AC6_AOT_CLEANUP; .printf \"tid=%x return=%p\n\", @$tid, poi(@rsp); db VGPUDX12+0x19288 L6; db VGPUDX12+0x192e9 L6; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuPatchStatus L3; gc"
+ba e1 VGPUDX12+0x192e9 ".if (@$t0 == 0) { r $t0=1; .echo XEO3_AC6_PLACED_RESOURCE_GATE_FIRST_HIT; db VGPUDX12+0x19288 L6; db VGPUDX12+0x192e9 L6; gc } .else { gc }"
+ba e1 VGPUDX12+0x19340 ".if (@rcx == 0) { .echo XEO3_AC6_NULL_PLACED_RESOURCE; .printf \"hr=%08x rcx=%p rbp=%p object=%p device=%p tid=%x\n\", @eax, @rcx, @rbp, @rbx, poi(@rbx+8), @$tid; db VGPUDX12+0x19288 L6; db VGPUDX12+0x192e9 L6; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!BridgeVgpuPatchStatus L3; r; kv 100; .echo XEO3_AC6_NULL_PLACED_RESOURCE_DONE; q } .else { gc }"
+g

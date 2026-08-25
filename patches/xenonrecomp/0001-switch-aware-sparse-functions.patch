@@ -1,0 +1,256 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b89407f..dcfcb23 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -20,6 +20,8 @@ set(XENONRECOMP_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/XenonRecomp)
+ 
+ project ("XenonRecomp-ALL")
+ 
++include(CTest)
++
+ add_subdirectory(${XENONANALYSE_ROOT})
+ add_subdirectory(${XENONRECOMP_ROOT})
+ add_subdirectory(${XENONUTILS_ROOT})
+diff --git a/XenonAnalyse/CMakeLists.txt b/XenonAnalyse/CMakeLists.txt
+index f13cdf4..082a300 100644
+--- a/XenonAnalyse/CMakeLists.txt
++++ b/XenonAnalyse/CMakeLists.txt
+@@ -12,3 +12,15 @@ add_library(LibXenonAnalyse "function.cpp")
+ target_include_directories(LibXenonAnalyse PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+ target_link_libraries(LibXenonAnalyse PUBLIC XenonUtils)
+ 
++if(BUILD_TESTING)
++    add_executable(XenonAnalyseFunctionTests
++        "tests/function_tests.cpp")
++    target_link_libraries(XenonAnalyseFunctionTests PRIVATE LibXenonAnalyse)
++    add_test(NAME XenonAnalyseFunctionTests COMMAND XenonAnalyseFunctionTests)
++
++    add_executable(XenonPpcSemanticsTests
++        "tests/ppc_semantics_tests.cpp")
++    target_link_libraries(XenonPpcSemanticsTests PRIVATE XenonUtils)
++    add_test(NAME XenonPpcSemanticsTests COMMAND XenonPpcSemanticsTests)
++endif()
++
+diff --git a/XenonAnalyse/function.cpp b/XenonAnalyse/function.cpp
+index 34add40..4a669d6 100644
+--- a/XenonAnalyse/function.cpp
++++ b/XenonAnalyse/function.cpp
+@@ -38,7 +38,11 @@ size_t Function::SearchBlock(size_t address) const
+     return -1;
+ }
+ 
+-Function Function::Analyze(const void* code, size_t size, size_t base)
++Function Function::Analyze(
++    const void* code,
++    size_t size,
++    size_t base,
++    const IndirectBranchTargets* indirectBranchTargets)
+ {
+     Function fn{ base, 0 };
+ 
+@@ -180,6 +184,38 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
+                 }
+                 else if (op == PPC_OP_CTR)
+                 {
++                    if (xop == 528 && indirectBranchTargets != nullptr)
++                    {
++                        const auto targets = indirectBranchTargets->find(addr);
++                        if (targets != indirectBranchTargets->end())
++                        {
++                            for (auto target = targets->second.rbegin();
++                                 target != targets->second.rend();
++                                 ++target)
++                            {
++                                if (*target < base || *target >= base + size)
++                                {
++                                    continue;
++                                }
++
++                                const auto existingBlock = fn.SearchBlock(*target);
++                                if (existingBlock != static_cast<size_t>(-1))
++                                {
++                                    blocks[existingBlock].indirectTarget = true;
++                                    continue;
++                                }
++
++                                blocks.emplace_back(*target - base, 0);
++                                blocks.back().indirectTarget = true;
++                                blockStack.emplace_back(blocks.size() - 1);
++                                DEBUG(blocks.back().parent = blockBase);
++                            }
++
++                            RESTORE_DATA();
++                            continue;
++                        }
++                    }
++
+                     // 5th bit of BO tells cpu to ignore the counter, which is a blr/bctr otherwise it's conditional
+                     const bool conditional = !(PPC_BO(instruction) & 0x10);
+                     if (conditional)
+@@ -210,7 +246,9 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
+         }
+     }
+ 
+-    // Sort and invalidate discontinuous blocks
++    // Sort blocks and discard disconnected tail-call components. Components
++    // rooted at a known indirect branch target are part of the same function,
++    // even when an inline jump table creates a gap in its address range.
+     if (blocks.size() > 1)
+     {
+         std::sort(blocks.begin(), blocks.end(), [](const Block& a, const Block& b)
+@@ -218,22 +256,36 @@ Function Function::Analyze(const void* code, size_t size, size_t base)
+             return a.base < b.base;
+         });
+ 
+-        size_t discontinuity = -1;
+-        for (size_t i = 0; i < blocks.size() - 1; i++)
++        std::vector<Block> retainedBlocks;
++        retainedBlocks.reserve(blocks.size());
++        size_t componentStart = 0;
++        for (size_t i = 1; i <= blocks.size(); ++i)
+         {
+-            if (blocks[i].base + blocks[i].size >= blocks[i + 1].base)
++            if (i < blocks.size() &&
++                blocks[i - 1].base + blocks[i - 1].size >= blocks[i].base)
+             {
+                 continue;
+             }
+ 
+-            discontinuity = i + 1;
+-            break;
+-        }
+-
+-        if (discontinuity != -1)
+-        {
+-            blocks.erase(blocks.begin() + discontinuity, blocks.end());
++            const auto componentEnd = i;
++            const bool keep = componentStart == 0 ||
++                std::any_of(
++                    blocks.begin() + componentStart,
++                    blocks.begin() + componentEnd,
++                    [](const Block& block)
++                    {
++                        return block.indirectTarget;
++                    });
++            if (keep)
++            {
++                retainedBlocks.insert(
++                    retainedBlocks.end(),
++                    blocks.begin() + componentStart,
++                    blocks.begin() + componentEnd);
++            }
++            componentStart = i;
+         }
++        blocks = std::move(retainedBlocks);
+     }
+ 
+     fn.size = 0;
+diff --git a/XenonAnalyse/function.h b/XenonAnalyse/function.h
+index 7df1c6a..a058f3c 100644
+--- a/XenonAnalyse/function.h
++++ b/XenonAnalyse/function.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <cstddef>
++#include <unordered_map>
+ #include <vector>
+ 
+ #ifdef _DEBUG
+@@ -11,11 +12,14 @@
+ 
+ struct Function
+ {
++    using IndirectBranchTargets = std::unordered_map<size_t, std::vector<size_t>>;
++
+     struct Block
+     {
+         size_t base{};
+         size_t size{};
+         size_t projectedSize{ static_cast<size_t>(-1) }; // scratch
++        bool indirectTarget{};
+         DEBUG(size_t parent{});
+ 
+         Block() 
+@@ -47,5 +51,9 @@ struct Function
+     }
+     
+     size_t SearchBlock(size_t address) const;
+-    static Function Analyze(const void* code, size_t size, size_t base);
++    static Function Analyze(
++        const void* code,
++        size_t size,
++        size_t base,
++        const IndirectBranchTargets* indirectBranchTargets = nullptr);
+ };
+diff --git a/XenonAnalyse/tests/function_tests.cpp b/XenonAnalyse/tests/function_tests.cpp
+new file mode 100644
+index 0000000..18e1b68
+--- /dev/null
++++ b/XenonAnalyse/tests/function_tests.cpp
+@@ -0,0 +1,65 @@
++#include <byteswap.h>
++#include <function.h>
++
++#include <array>
++#include <cstdint>
++#include <iostream>
++
++namespace
++{
++bool Check(const bool condition, const char* message)
++{
++    if (!condition)
++    {
++        std::cerr << message << '\n';
++    }
++    return condition;
++}
++}
++
++int main()
++{
++    constexpr std::size_t base = 0x1000;
++    std::array<std::uint32_t, 8> code = {
++        ByteSwap(0x60000000u), // nop
++        ByteSwap(0x4E800420u), // bctr
++        ByteSwap(0xDEADBEEFu), // inline jump-table data
++        ByteSwap(0xCAFEBABEu), // inline jump-table data
++        ByteSwap(0x38630001u), // addi r3, r3, 1
++        ByteSwap(0x4E800020u), // blr
++        ByteSwap(0x38630002u), // addi r3, r3, 2
++        ByteSwap(0x4E800020u), // blr
++    };
++
++    const auto withoutTargets = Function::Analyze(code.data(), sizeof(code), base);
++    if (!Check(withoutTargets.size == 0x8, "bctr should terminate an unseeded function"))
++    {
++        return 1;
++    }
++
++    Function::IndirectBranchTargets targets = {
++        { base + 0x4, { base + 0x10, base + 0x18, base + 0x10, base + 0x100 } },
++    };
++    const auto withTargets = Function::Analyze(code.data(), sizeof(code), base, &targets);
++    if (!Check(withTargets.size == sizeof(code), "switch targets should extend the function"))
++    {
++        return 1;
++    }
++    if (!Check(withTargets.SearchBlock(base + 0x8) == static_cast<std::size_t>(-1),
++               "inline jump-table data should remain outside analyzed blocks"))
++    {
++        return 1;
++    }
++    if (!Check(withTargets.SearchBlock(base + 0x10) != static_cast<std::size_t>(-1),
++               "first switch case was not analyzed"))
++    {
++        return 1;
++    }
++    if (!Check(withTargets.SearchBlock(base + 0x18) != static_cast<std::size_t>(-1),
++               "second switch case was not analyzed"))
++    {
++        return 1;
++    }
++
++    return 0;
++}

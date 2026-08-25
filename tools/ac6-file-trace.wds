@@ -1,0 +1,5 @@
+sxd e0000001
+sxd 40080201
+bp KERNELBASE!CreateFileW ".printf \"CFW %mu\n\", @rcx; g"
+bp KERNELBASE!CreateFileA ".printf \"CFA %ma\n\", @rcx; g"
+g

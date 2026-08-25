@@ -1,0 +1,8 @@
+sxd e0000001
+sxd 40080201
+sxe ld:xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+g
+.reload /f xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll
+.echo HOST_PROFILE_MODULE_LOADED
+bp xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!XeO3ProbeThunk ".echo HOST_PROFILE_THUNK; r rcx; r rbx; r r15; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!PrecompiledPointers L10; dq xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6!ProbeHostValue0 L3; q"
+g
