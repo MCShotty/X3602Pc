@@ -22,6 +22,16 @@ Emu.exe
 *.dxil
 *.wpix
 *.pix3
+*.class
+
+# Raw guest memory, Xenia trace data, and incidental tool output
+*.bin
+*.log
+*.xtr
+/stdout
+/????????_*.draws.tsv
+/????????_*.textures.tsv
+/????????_*.vertices.tsv
 
 # Generated/recompiled title code and local experiments
 /build/

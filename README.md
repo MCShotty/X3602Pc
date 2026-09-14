@@ -11,11 +11,17 @@ is not a general-purpose Xbox 360 emulator.
 
 ## Repository policy
 
-This repository contains only original bridge code, configuration, analysis
-metadata, tests, and reproducible patches. It does not contain Xbox game data,
+This repository contains bridge/tool code, configuration, analysis metadata,
+tests, and attributed reproducible patches. See [third-party notices](THIRD_PARTY_NOTICES.md).
+It does not contain Xbox game data,
 Microsoft binaries, decrypted executables, extracted shaders, keys, or ownership
 bypasses. Those inputs remain local and must come from software you own and a
 legitimate XeO3/Gaming Services installation.
+
+The exclusive development workspace on the current PC is
+`C:\Users\CaptainMcShotgun\Documents\x3602Pc`. The separate AC6 lab is a runtime
+deployment destination, not another source checkout. See [AGENTS.md](AGENTS.md)
+for workspace and publication boundaries.
 
 Pinned title input:
 
@@ -34,6 +40,9 @@ Pinned title input:
 - `profiles/xeo3`: hash-gated XeO3 host profiles.
 - `patches/xenonrecomp`: reproducible patches applied to a disposable copy of
   the pinned upstream submodule.
+- `patches/xenia`, `patches/xenosrecomp`: pinned local research-tool changes;
+  see [upstream reproduction notes](docs/UPSTREAM_RESEARCH.md).
+- `docs`: checkpoint evidence, limitations, and the deferred source-review plan.
 - `tests`: native contract, state, dispatch, synchronization, and VGPU tests.
 - `tools`: build, analysis, deployment, capture, and debugger automation.
 
@@ -77,6 +86,11 @@ and build the probe and public unit tests. Generated code, captures, build outpu
 game assets, and Microsoft runtime files are intentionally ignored by Git.
 
 ## Status
+
+See the [2026-09-14 checkpoint](docs/STATUS.md) for verified progress, deployed
+versus built artifacts, and remaining graphics/performance/stability failures.
+Runtime testing is paused. The next development task is the
+[detailed Xenia, XenonRecomp, and XenosRecomp source review](docs/NEXT_STEPS.md).
 
 This is pre-release preservation research. Expect title-specific assumptions,
 strict host hashes, diagnostic instrumentation, and spectacularly unhelpful

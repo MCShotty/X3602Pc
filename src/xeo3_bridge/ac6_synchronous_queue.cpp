@@ -8,6 +8,8 @@ extern "C" PPC_FUNC(__imp__sub_82346648);
 
 extern "C"
 {
+extern volatile std::uint32_t BridgeSynchronousQueueEnabled;
+extern volatile std::uint64_t BridgeSynchronousQueueBypassCount;
 extern volatile std::uint64_t BridgeSynchronousQueueSubmitCount;
 extern volatile std::uint64_t BridgeSynchronousQueueTaskCount;
 extern volatile std::uint64_t BridgeSynchronousQueueFailureCount;
@@ -28,6 +30,7 @@ constexpr std::uint32_t kFreeTaskPoolOffset = 22748U;
 
 void PublishGpr(PPCContext& ctx, const std::size_t index) noexcept
 {
+    static_cast<void>(ctx);
     switch (index)
     {
     case 3:
@@ -128,6 +131,15 @@ PPC_FUNC(sub_82346648)
     const std::uint64_t payload = ctx.r4.u64;
 
     BridgeSynchronousQueueLastObject = queue;
+    BridgeSynchronousQueueLastPhase = 0;
+    if (BridgeSynchronousQueueEnabled == 0)
+    {
+        BridgeSynchronousQueueBypassCount =
+            BridgeSynchronousQueueBypassCount + 1;
+        __imp__sub_82346648(ctx, base);
+        return;
+    }
+
     BridgeSynchronousQueueLastPhase = 1;
 
     if (queue != kMissionQueue)

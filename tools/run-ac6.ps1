@@ -5,6 +5,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$validatedHost = & (Join-Path $PSScriptRoot 'test-ac6-host-profile.ps1') `
+    -LabRoot $LabRoot -DvdRoot $DvdRoot
 $packageName = 'Xbox360BackwardCompatibil.PrimaryFuzionFrenzyFuzio'
 $configSource = Join-Path $PSScriptRoot '..\configs\ac6\LaunchArguments.txt'
 $prepareShaderCache = Join-Path $PSScriptRoot 'prepare-ac6-shader-cache.ps1'
@@ -44,14 +46,24 @@ $configText = [System.Text.RegularExpressions.Regex]::Replace($configText, '\r?\
 )
 
 New-Item -ItemType Directory -Path (Join-Path $LabRoot 'Storage') -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $LabRoot 'XeO3_ShaderCache') -Force | Out-Null
-$cacheState = & $prepareShaderCache `
-    -LabRoot $LabRoot `
-    -DvdRoot $DvdRoot `
-    -ConfigPath $configSource
-$package = Get-AppxPackage -Name $packageName -ErrorAction Stop
 $storageRoot = Join-Path $LabRoot 'Storage'
 $shaderCacheRoot = Join-Path $LabRoot 'XeO3_ShaderCache'
+$writableShaderCacheRoot = Join-Path $storageRoot 'ShaderCache\XeO3_ShaderCache'
+New-Item -ItemType Directory -Path $shaderCacheRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $writableShaderCacheRoot -Force | Out-Null
+$writableCacheState = & $prepareShaderCache `
+    -LabRoot $LabRoot `
+    -DvdRoot $DvdRoot `
+    -ConfigPath $configSource `
+    -ShaderCacheRoot $writableShaderCacheRoot `
+    -VgpuPath $validatedHost.VgpuPath -KernelAotPath $validatedHost.KernelAotPath
+$sourceCacheState = & $prepareShaderCache `
+    -LabRoot $LabRoot `
+    -DvdRoot $DvdRoot `
+    -ConfigPath $configSource `
+    -ShaderCacheRoot $shaderCacheRoot `
+    -VgpuPath $validatedHost.VgpuPath -KernelAotPath $validatedHost.KernelAotPath
+$package = Get-AppxPackage -Name $packageName -ErrorAction Stop
 $arguments = "dvd `"$DvdRoot`" root `"$LabRoot`" systemfiles `"$LabRoot`" storage `"$storageRoot`" shadercache `"$shaderCacheRoot`""
 
 Push-Location $LabRoot

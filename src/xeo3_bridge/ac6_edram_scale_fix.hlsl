@@ -25,31 +25,34 @@ uint GetEdramAddress(uint2 coordinate)
     uint resolutionSamplePlane =
         (resolutionSample.y * divisor + resolutionSample.x) * 2621440u;
 
+    // XeO3 stores the four D3D12 MSAA samples in a hardware-specific 2x2
+    // swizzle. Keep its original addressing and only repair the color unpack.
     uint evenX = scaledCoordinate.x & ~1u;
-    uint xWithinPair = ((scaledCoordinate.x - evenX) << 1u) +
-                       (sampleIndex >> 1u);
-    uint yWithinPair = ((scaledCoordinate.y << 1u) & 2u) |
-                       (sampleIndex & 1u);
-    if ((xWithinPair - 1u) < 2u)
+    uint doubledXParity =
+        (2u * (scaledCoordinate.x - evenX)) & 0x01FFFFFEu;
+    uint doubledY = scaledCoordinate.y << 1u;
+    uint sampleX = doubledXParity + (sampleIndex >> 1u);
+    uint sampleY = (doubledY & 2u) | (sampleIndex & 1u);
+    if ((sampleX - 1u) < 2u)
     {
-        xWithinPair ^= 3u;
+        sampleX ^= 3u;
     }
-    if ((yWithinPair - 1u) < 2u)
+    if ((sampleY - 1u) < 2u)
     {
-        yWithinPair ^= 3u;
+        sampleY ^= 3u;
     }
 
-    uint tileX = evenX % 40u;
-    uint tileY = ((scaledCoordinate.y << 1u) & 12u) |
-                 (yWithinPair & 3u);
-    uint tileColumn = scaledCoordinate.x / 40u;
-    uint tileRow = (scaledCoordinate.y >> 3u) & 0x00FFFFFFu;
+    uint tileX = scaledCoordinate.x / 40u;
+    uint tileY = scaledCoordinate.y >> 3u;
+    uint withinTileX = evenX % 40u;
+    uint withinTileY = (sampleY & 3u) | (doubledY & 12u);
     uint pitch = edramPitchTiles & 0x00FFFFFFu;
-    uint tile = (tileRow * pitch + edramBaseTiles + tileColumn) & 2047u;
+    uint tile =
+        (tileY * pitch + edramBaseTiles + tileX) & 2047u;
 
     return tile * 1280u +
-           ((tileY * 40u + tileX) << 1u) +
-           xWithinPair + resolutionSamplePlane;
+           2u * (withinTileY * 40u + withinTileX) + sampleX +
+           resolutionSamplePlane;
 }
 
 uint4 main(PixelInput input) : SV_Target0

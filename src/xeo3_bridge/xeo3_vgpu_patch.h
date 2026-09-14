@@ -11,6 +11,7 @@ constexpr std::uint32_t kXenosFetchTableCapacity = 32;
 constexpr std::size_t kXenosSamplerAddressModeCount = 8;
 constexpr std::size_t kFetchTableDetourSize = 17;
 constexpr std::size_t kShaderCompileDetourSize = 16;
+constexpr std::size_t kXenosTranslateDetourSize = 16;
 constexpr std::size_t kTextureTransferDetourSize = 18;
 constexpr std::size_t kStructuredTextureTransferDetourSize = 16;
 constexpr std::size_t kConstantUploadDetourSize = 18;
@@ -67,6 +68,18 @@ struct GraphicsPipelineSignature {
   std::uint32_t depthStencilFormat = 0;
   std::uint32_t inputElementCount = 0;
   std::uint32_t renderTarget0WriteMask = 0;
+  std::uint32_t fillMode = 0;
+  std::uint32_t cullMode = 0;
+  std::int32_t depthBias = 0;
+  std::uint32_t depthWriteMask = 0;
+  std::uint32_t depthFunc = 0;
+  bool frontCounterClockwise = false;
+  bool depthClipEnable = false;
+  bool multisampleEnable = false;
+  bool antialiasedLineEnable = false;
+  bool depthEnable = false;
+  bool stencilEnable = false;
+  bool renderTarget0BlendEnable = false;
   bool hasExpectedInputLayout = false;
   bool hasExpectedFixedState = false;
   bool hasExpectedEdramScaleFixedState = false;
@@ -95,11 +108,35 @@ enum class Ac6EdramDrawPipeline : std::uint32_t {
   Load = 523,
 };
 
+struct Ac6EdramBoundEvidence {
+  std::uint32_t renderTargetCount = 0;
+  std::uint32_t viewFormat = 0;
+  std::uint32_t sampleCount = 0;
+  std::uint64_t targetWidth = 0;
+  std::uint32_t targetHeight = 0;
+  bool hasDepthStencil = false;
+  bool hasConstants = false;
+  std::uint64_t rootTableMask = 0;
+  std::array<std::uint32_t, 16> constants{};
+};
+
 enum class Ac6EdramConstantKind : std::uint32_t {
   None = 0,
   Candidate = 1,
   Load = 523,
   Scale = 620,
+};
+
+enum class Ac6TextureUnpackKind : std::uint32_t {
+  None = 0,
+  Frame = 1,
+  TargetPreview = 2,
+};
+
+enum class Ac6PrimitiveRestartPipeline : std::uint32_t {
+  None = 0,
+  TerrainFan = 5,
+  SkyStrip = 6,
 };
 
 enum class Ac6Pso341TaskWidthState : std::uint32_t {
@@ -126,6 +163,9 @@ EncodeAbsoluteJump(const void *target) noexcept;
 
 std::array<std::uint8_t, kShaderCompileDetourSize>
 EncodeShaderCompileJump(const void *target) noexcept;
+
+std::array<std::uint8_t, kXenosTranslateDetourSize>
+EncodeXenosTranslateJump(const void *target) noexcept;
 
 std::array<std::uint8_t, kTextureTransferDetourSize>
 EncodeTextureTransferJump(const void *target) noexcept;
@@ -156,6 +196,9 @@ bool HasExpectedFetchTablePrologue(const std::uint8_t *bytes,
 bool HasExpectedShaderCompilePrologue(const std::uint8_t *bytes,
                                       std::size_t byteCount) noexcept;
 
+bool HasExpectedXenosTranslatePrologue(const std::uint8_t *bytes,
+                                       std::size_t byteCount) noexcept;
+
 bool HasExpectedTextureTransferPrologue(const std::uint8_t *bytes,
                                         std::size_t byteCount) noexcept;
 
@@ -181,6 +224,22 @@ bool PatchXenosScalarReciprocals(const void *source, std::size_t sourceSize,
                                  std::string &patchedSource,
                                  std::uint32_t &patchCount) noexcept;
 
+bool MatchesAc6Pso533PixelShaderFingerprint(
+    std::size_t sourceSize,
+    const std::array<std::uint8_t, 32> &digest) noexcept;
+
+bool MatchesAc6Pso540VertexShaderFingerprint(
+    std::size_t sourceSize,
+    const std::array<std::uint8_t, 32> &digest) noexcept;
+
+bool PatchAc6WaveBallots(const void *source, std::size_t sourceSize,
+                         std::string &patchedSource,
+                         std::uint32_t &patchCount) noexcept;
+
+bool PatchAc6Pso533WaveBallots(const void *source, std::size_t sourceSize,
+                               std::string &patchedSource,
+                               std::uint32_t &patchCount) noexcept;
+
 bool PatchAc6ScreenSpaceVposScale(const void *source, std::size_t sourceSize,
                                   std::string &patchedSource,
                                   std::uint32_t &patchCount) noexcept;
@@ -194,12 +253,31 @@ bool PatchAc6Pso537HalfWidthUv(const void *source, std::size_t sourceSize,
                                std::uint32_t &patchCount) noexcept;
 
 bool PatchAc6ToneMapInterpolant(const void *source, std::size_t sourceSize,
-                                 std::string &patchedSource,
-                                 std::uint32_t &patchCount) noexcept;
+                                std::string &patchedSource,
+                                std::uint32_t &patchCount) noexcept;
 
 bool MatchesAc6ExposureShaderFingerprint(
     std::size_t sourceSize,
     const std::array<std::uint8_t, 32> &digest) noexcept;
+
+bool MatchesAc6SkyRestartShaderFingerprint(
+    std::size_t sourceSize,
+    const std::array<std::uint8_t, 32> &digest) noexcept;
+
+bool MatchesAc6TerrainFanRestartShaderFingerprint(
+    std::size_t sourceSize,
+    const std::array<std::uint8_t, 32> &digest) noexcept;
+
+bool MatchesAc6AircraftRestartShaderFingerprint(
+    std::size_t sourceSize,
+    const std::array<std::uint8_t, 32> &digest) noexcept;
+
+bool MatchesAc6ShadowRestartShaderFingerprint(
+    std::size_t sourceSize,
+    const std::array<std::uint8_t, 32> &digest) noexcept;
+
+Ac6PrimitiveRestartPipeline ClassifyAc6PrimitiveRestartPipeline(
+    const GraphicsPipelineSignature &signature) noexcept;
 
 bool PatchAc6ExposureSample(const void *source, std::size_t sourceSize,
                             std::string &patchedSource,
@@ -208,27 +286,33 @@ bool PatchAc6ExposureSample(const void *source, std::size_t sourceSize,
 bool IsAc6TextureUnpackTransfer(
     const std::array<std::uint32_t, 6> &constants) noexcept;
 
-bool PatchAc6TextureUnpackEndian(
-    std::array<std::uint32_t, 6> &constants,
-    std::uint32_t replacementEndian) noexcept;
+Ac6TextureUnpackKind ClassifyAc6TextureUnpackTransfer(
+    const std::array<std::uint32_t, 6> &constants) noexcept;
+
+bool PatchAc6TextureUnpackEndian(std::array<std::uint32_t, 6> &constants,
+                                 std::uint32_t replacementEndian) noexcept;
 
 std::array<std::uint32_t, 6>
 ExtractStructuredTextureTransferConstants(const void *descriptor) noexcept;
 
-Ac6Pso341TaskWidthState ClassifyAc6Pso341TaskWidth(
-    const void *source, std::size_t sourceSize) noexcept;
+Ac6Pso341TaskWidthState
+ClassifyAc6Pso341TaskWidth(const void *source, std::size_t sourceSize) noexcept;
 
-bool ShouldTrackAc6Pso341UploadBuffer(std::uint32_t heapType,
-                                      bool isBuffer,
+bool ShouldTrackAc6Pso341UploadBuffer(std::uint32_t heapType, bool isBuffer,
                                       std::uint64_t resourceSize) noexcept;
 
-bool ResolveAc6Pso341UploadOffset(std::uint64_t gpuBase,
-                                  std::uint32_t stride,
+bool ResolveAc6Pso341UploadOffset(std::uint64_t gpuBase, std::uint32_t stride,
                                   std::uint32_t slotCount,
                                   std::uint64_t mappedSpan,
                                   std::uint64_t gpuAddress,
                                   std::uint64_t sourceSize,
                                   std::uint64_t &cpuOffset) noexcept;
+
+bool IsConstantUploadContextGeometryValid(std::uint64_t gpuBase,
+                                          std::uint32_t stride,
+                                          std::uint32_t slotCount,
+                                          std::uint64_t mappedSpan,
+                                          std::uint64_t sourceSize) noexcept;
 
 std::uint64_t DecodeAmdConstantBufferGpuAddress(
     const std::array<std::uint64_t, 4> &descriptorWords) noexcept;
@@ -238,13 +322,12 @@ bool MatchesAc6Pso341ComputeShaderFingerprint(
     const std::array<std::uint8_t, 32> &digest) noexcept;
 
 bool MatchesAc6Pso341CachedPipelineBlob(
-    std::size_t blobSize,
-    const std::array<std::uint8_t, 32> &digest) noexcept;
+    std::size_t blobSize, const std::array<std::uint8_t, 32> &digest) noexcept;
 
-bool PatchAc6Pso341TaskWidth(void *source, std::size_t sourceSize,
-                             std::uint32_t &originalPackedDimensions,
-                             std::uint32_t &replacementPackedDimensions)
-    noexcept;
+bool PatchAc6Pso341TaskWidth(
+    void *source, std::size_t sourceSize,
+    std::uint32_t &originalPackedDimensions,
+    std::uint32_t &replacementPackedDimensions) noexcept;
 
 Ac6EdramConstantKind ClassifyAc6EdramTransferConstants(
     const std::array<std::uint32_t, 16> &constants) noexcept;
@@ -252,16 +335,23 @@ Ac6EdramConstantKind ClassifyAc6EdramTransferConstants(
 std::array<std::uint64_t, 8> PackAc6EdramTransferConstants(
     const std::array<std::uint32_t, 16> &constants) noexcept;
 
+std::uint32_t ComputeAc6EdramScaleAddress(
+    std::uint32_t x, std::uint32_t y, std::uint32_t resolutionDivisor,
+    std::uint32_t edramBaseTiles, std::uint32_t sampleIndex,
+    std::uint32_t edramPitchTiles) noexcept;
+
 bool PatchAc6GroundFetchIndices(const void *source, std::size_t sourceSize,
                                 std::string &patchedSource,
                                 std::uint32_t &patchCount) noexcept;
 
-bool PatchXenosIndexBufferSemantics(const void *source, std::size_t sourceSize,
-                                    std::string &patchedSource,
-                                    std::uint32_t &patchCount) noexcept;
+bool PatchXenosIndexBufferSemantics(
+    const void *source, std::size_t sourceSize, std::string &patchedSource,
+    std::uint32_t &patchCount,
+    bool patchPrimitiveRestartParity = false,
+    std::uint32_t restartScanLimit = 64) noexcept;
 
 bool HashBytesSha256(const void *bytes, std::size_t byteCount,
-                    std::array<std::uint8_t, 32> &digest) noexcept;
+                     std::array<std::uint8_t, 32> &digest) noexcept;
 
 bool ExtractGraphicsPipelineStreamSignature(
     const void *stream, std::size_t streamSize,
@@ -271,14 +361,19 @@ bool ExtractGraphicsPipelineStreamSignature(
 bool IsAc6CorruptEdramRestorePipeline(
     const GraphicsPipelineSignature &signature) noexcept;
 
+bool IsAc6Pso535CullPipeline(
+    const GraphicsPipelineSignature &signature) noexcept;
+
+bool IsAc6Pso535CullPipelineDescriptor(
+    const GraphicsPipelineSignature &signature) noexcept;
+
 bool IsAc6EdramScalePipeline(
     const GraphicsPipelineSignature &signature) noexcept;
 
 bool IsAc6EdramScalePipelineDescriptor(
     const GraphicsPipelineSignature &signature) noexcept;
 
-const void *GetAc6EdramScaleFixPixelShader(
-    std::size_t &byteCount) noexcept;
+const void *GetAc6EdramScaleFixPixelShader(std::size_t &byteCount) noexcept;
 
 bool IsAc6EdramLoadPipeline(
     const GraphicsPipelineSignature &signature) noexcept;
@@ -286,45 +381,55 @@ bool IsAc6EdramLoadPipeline(
 bool IsAc6EdramLoadPipelineDescriptor(
     const GraphicsPipelineSignature &signature) noexcept;
 
-const void *GetAc6EdramLoadFixPixelShader(
-    std::size_t &byteCount) noexcept;
+const void *GetAc6EdramLoadFixPixelShader(std::size_t &byteCount) noexcept;
 
-const void *GetAc6EdramTransferVertexShader(
-    std::size_t &byteCount) noexcept;
+const void *GetAc6EdramTransferVertexShader(std::size_t &byteCount) noexcept;
 
-const void *GetAc6Pso341WidthFixComputeShader(
-    std::size_t &byteCount) noexcept;
+const void *GetAc6Pso341WidthFixComputeShader(std::size_t &byteCount) noexcept;
 
+bool PatchAc6HalfWidthFullscreenScissor(void *record,
+                                        std::size_t recordSize) noexcept;
 
-bool PatchAc6HalfWidthFullscreenScissor(
-    void *record, std::size_t recordSize) noexcept;
+bool IsAc6HalfWidthMsaaViewport(
+    const DrawRecordSignature &drawSignature,
+    const GraphicsPipelineSignature &pipelineSignature,
+    const void *pipelineState) noexcept;
+
+bool PatchAc6HalfWidthMsaaViewport(
+    void *record, std::size_t recordSize,
+    const GraphicsPipelineSignature &pipelineSignature,
+    const void *pipelineState, std::uint32_t &originalWidthBits,
+    std::uint32_t &replacementWidthBits) noexcept;
 
 bool ExtractDrawRecordSignature(const void *record, std::size_t recordSize,
                                 DrawRecordSignature &signature) noexcept;
 
-Ac6EdramDrawPipeline ClassifyAc6EdramDrawPipeline(
-    const DrawRecordSignature &signature,
-    const void *activePipelineState) noexcept;
+Ac6EdramDrawPipeline
+ClassifyAc6EdramDrawPipeline(const DrawRecordSignature &signature,
+                             const void *activePipelineState) noexcept;
 
 Ac6EdramDrawPipeline ClassifyAc6EdramCachedPipelineBlob(
-    std::size_t blobSize,
-    const std::array<std::uint8_t, 32> &digest) noexcept;
+    std::size_t blobSize, const std::array<std::uint8_t, 32> &digest) noexcept;
 
-bool IsAc6CorruptEdramRestoreDrawSignature(
-    const DrawRecordSignature &signature,
-    const void *pipelineState) noexcept;
+bool IsPixOpaquePipelineBlob(std::size_t blobSize,
+                            const std::array<std::uint8_t, 32> &digest) noexcept;
+Ac6EdramDrawPipeline ClassifyAc6BoundEdramDraw(
+    const DrawRecordSignature &signature, const void *pipelineState,
+    const Ac6EdramBoundEvidence &evidence) noexcept;
+
+bool IsAc6CorruptEdramRestoreDrawSignature(const DrawRecordSignature &signature,
+                                           const void *pipelineState) noexcept;
 
 bool ShouldSuppressAc6HostEdramRestoreDraw(
     const DrawRecordSignature &signature, const void *pipelineState,
     Ac6EdramDrawPipeline fingerprintedPipeline, bool enabled) noexcept;
 
-bool IsAc6CorruptEdramRestoreDrawRecord(
-    const void *record, std::size_t recordSize,
-    const void *pipelineState) noexcept;
+bool IsAc6CorruptEdramRestoreDrawRecord(const void *record,
+                                        std::size_t recordSize,
+                                        const void *pipelineState) noexcept;
 
 bool IsAc6CorruptEdramRestoreCachedBlob(
-    std::size_t blobSize,
-    const std::array<std::uint8_t, 32> &digest) noexcept;
+    std::size_t blobSize, const std::array<std::uint8_t, 32> &digest) noexcept;
 
 bool HasExpectedTightAlignmentGate(const std::uint8_t *bytes,
                                    std::size_t byteCount) noexcept;

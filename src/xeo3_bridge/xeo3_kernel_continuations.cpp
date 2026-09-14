@@ -100,6 +100,8 @@ constexpr std::uint32_t kBugCheckExBranchIar = 0x8005F0C8U;
 constexpr wchar_t kKernelAotModuleName[] =
     L"xeo3_5fb3687c_001748c4.dll";
 constexpr std::uint32_t kKernelAotTimestamp = 0x6A588000U;
+// The 2608 package has byte-identical .text, .pdata, .data and relocations.
+constexpr std::uint32_t kKernelAot2608Timestamp = 0x6A967651U;
 constexpr std::uint32_t kKernelAotImageSize = 0x0013E000U;
 constexpr std::uint32_t kKernelBugCheckExHostRva = 0x00021899U;
 constexpr std::size_t kPinnedKernelFileSize = 1507328;
@@ -844,7 +846,8 @@ FingerprintResult ResolvePinnedNativeHost(
     if (!IsReadableRange(ntHeaders, sizeof(*ntHeaders)) ||
         ntHeaders->Signature != IMAGE_NT_SIGNATURE ||
         ntHeaders->FileHeader.Machine != IMAGE_FILE_MACHINE_AMD64 ||
-        ntHeaders->FileHeader.TimeDateStamp != kKernelAotTimestamp ||
+        (ntHeaders->FileHeader.TimeDateStamp != kKernelAotTimestamp &&
+         ntHeaders->FileHeader.TimeDateStamp != kKernelAot2608Timestamp) ||
         ntHeaders->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC ||
         ntHeaders->OptionalHeader.SizeOfImage != kKernelAotImageSize)
     {

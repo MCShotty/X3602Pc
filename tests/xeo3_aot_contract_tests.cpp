@@ -63,11 +63,30 @@ int wmain(const int argumentCount, wchar_t** arguments)
         GetProcAddress(module, "PrecompiledImportTable"));
     auto* const pointers = reinterpret_cast<std::uintptr_t*>(
         GetProcAddress(module, "PrecompiledPointers"));
+    auto* const synchronousQueueEnabled =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeSynchronousQueueEnabled"));
     CHECK(init != nullptr);
     CHECK(cleanup != nullptr);
     CHECK(imports != nullptr);
     CHECK(pointers != nullptr);
-    constexpr std::array<const char*, 9> archiveSignalExports{
+    CHECK(synchronousQueueEnabled != nullptr);
+    constexpr std::array<const char*, 81> runtimeExports{
+        "BridgeVgpuShadowRestartShaderCount",
+        "BridgeVgpuAircraftRestartShaderCount",
+        "BridgeVgpuPipelineStateLastFailureResult",
+        "BridgeVgpuPipelineStateLastFailureCreateSequence",
+        "BridgeImportCountersEnabled",
+        "BridgeImportCounterCount",
+        "BridgeImportCounts",
+        "BridgeFunctionLookupEntryCount",
+        "BridgeIntegerImportSyncEnabled",
+        "BridgeIntegerImportSyncAttemptCount",
+        "BridgeIntegerImportSyncHitCount",
+        "BridgeIntegerImportSyncFallbackCount",
+        "BridgeIntegerImportSyncLastThunk",
+        "BridgeGuestIarTelemetryEnabled",
+        "BridgeContinuousStatePublicationMode",
         "BridgeSynchronousArchiveSignalCount",
         "BridgeSynchronousArchiveSignalFailureCount",
         "BridgeSynchronousArchiveReadLastEvent",
@@ -77,11 +96,121 @@ int wmain(const int argumentCount, wchar_t** arguments)
         "BridgePostIntroCallbackCount",
         "BridgePostIntroCallbackReturnCount",
         "BridgeThreadImportStates",
+        "BridgeFastSynchronizationTelemetryEnabled",
+        "BridgeFastCriticalSectionsEnabled",
+        "BridgeFastCriticalSectionAttemptCount",
+        "BridgeFastCriticalSectionHitCount",
+        "BridgeFastCriticalSectionFallbackCount",
+        "BridgeFastCriticalSectionSignalCount",
+        "BridgeFastSpinLocksEnabled",
+        "BridgeFastSpinLockAttemptCount",
+        "BridgeFastSpinLockHitCount",
+        "BridgeFastSpinLockFallbackCount",
+        "BridgeFastSpinLockContentionCount",
+        "BridgeFastSpinLockLastThunk",
+        "BridgeFastSpinLockLastAddress",
+        "BridgeFastIrqlEnabled",
+        "BridgeFastIrqlTelemetryEnabled",
+        "BridgeFastIrqlAttemptCount",
+        "BridgeFastIrqlHitCount",
+        "BridgeFastIrqlNativeFallbackCount",
+        "BridgeFastIrqlInvalidFallbackCount",
+        "BridgeFastIrqlLastThunk",
+        "BridgeFastIrqlLastOldIrql",
+        "BridgeFastIrqlLastNewIrql",
+        "BridgeFastIrqlLastPendingIrql",
+        "BridgeRaiseIrqlOldPassiveCount",
+        "BridgeRaiseIrqlOldApcCount",
+        "BridgeRaiseIrqlOldDispatchCount",
+        "BridgeRaiseIrqlUnexpectedCount",
+        "BridgeIndirectTelemetryEnabled",
+        "BridgeIndirectStateSyncEnabled",
+        "BridgeSynchronousQueueEnabled",
+        "BridgeSynchronousQueueBypassCount",
+        "BridgeVgpuXenosTranslateHookInstalled",
+        "BridgeVgpuXenosTranslateHookFailure",
+        "BridgeVgpuXenosTranslateCount",
+        "BridgeVgpuXenosUcodeCaptureCount",
+        "BridgeVgpuXenosUcodeCaptureFailure",
+        "BridgeVgpuXenosShaderMapFailure",
+        "BridgeVgpuXenosLastStage",
+        "BridgeVgpuXenosLastUcodeSize",
+        "BridgeVgpuXenosLastUcodeHash0",
+        "BridgeVgpuXenosLastUcodeHash1",
+        "BridgeVgpuXenosLastUcodeHash2",
+        "BridgeVgpuXenosLastUcodeHash3",
+        "BridgeVgpuGroundFixEnabled",
+        "BridgeVgpuReciprocalFixEnabled",
+        "BridgeVgpuWaveBallotFingerprintMatchCount",
+        "BridgeVgpuWaveBallotFixShaderCount",
+        "BridgeVgpuWaveBallotFixSiteCount",
+        "BridgeVgpuWaveBallotFixFailure",
+        "BridgeVgpuWaveBallotFixEnabled",
+        "BridgeVgpuPso535CullFixEnabled",
+        "BridgeVgpuPso535CullCandidateCount",
+        "BridgeVgpuPso535CullFingerprintMatchCount",
+        "BridgeVgpuPso535CullFixPipelineCount",
+        "BridgeVgpuPso535CullFixFailure",
+        "BridgeVgpuPso535CullLastOriginalMode",
+        "BridgeVgpuPso535CullLastReplacementMode",
     };
-    for (const auto* const exportName : archiveSignalExports)
+    for (const auto* const exportName : runtimeExports)
     {
         CHECK(GetProcAddress(module, exportName) != nullptr);
     }
+    auto* const importCountersEnabled =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeImportCountersEnabled"));
+    auto* const importCounterCount =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeImportCounterCount"));
+    auto* const importCounts =
+        reinterpret_cast<volatile std::uint64_t*>(
+            GetProcAddress(module, "BridgeImportCounts"));
+    auto* const functionLookupEntryCount =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeFunctionLookupEntryCount"));
+    auto* const integerImportSyncEnabled =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeIntegerImportSyncEnabled"));
+    auto* const guestIarTelemetryEnabled =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeGuestIarTelemetryEnabled"));
+    auto* const continuousStatePublicationMode =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeContinuousStatePublicationMode"));
+    auto* const fastIrqlEnabled =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeFastIrqlEnabled"));
+    auto* const fastIrqlTelemetryEnabled =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeFastIrqlTelemetryEnabled"));
+    auto* const fastSynchronizationTelemetryEnabled =
+        reinterpret_cast<volatile std::uint32_t*>(GetProcAddress(
+            module,
+            "BridgeFastSynchronizationTelemetryEnabled"));
+    auto* const indirectTelemetryEnabled =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeIndirectTelemetryEnabled"));
+    auto* const indirectStateSyncEnabled =
+        reinterpret_cast<volatile std::uint32_t*>(
+            GetProcAddress(module, "BridgeIndirectStateSyncEnabled"));
+    CHECK(importCountersEnabled != nullptr);
+    CHECK(importCounterCount != nullptr);
+    CHECK(importCounts != nullptr);
+    CHECK(functionLookupEntryCount != nullptr);
+    CHECK(integerImportSyncEnabled != nullptr);
+    CHECK(guestIarTelemetryEnabled != nullptr);
+    CHECK(continuousStatePublicationMode != nullptr);
+    CHECK(fastIrqlEnabled != nullptr);
+    CHECK(fastIrqlTelemetryEnabled != nullptr);
+    CHECK(fastSynchronizationTelemetryEnabled != nullptr);
+    CHECK(indirectTelemetryEnabled != nullptr);
+    CHECK(indirectStateSyncEnabled != nullptr);
+    CHECK(*fastSynchronizationTelemetryEnabled == 0);
+    CHECK(*indirectTelemetryEnabled == 0);
+    CHECK(*indirectStateSyncEnabled == 0);
+    CHECK(*importCounterCount == 229);
 
     std::array<void*, 34> vtable{};
     vtable[0] = reinterpret_cast<void*>(&ExecuteIar);
@@ -94,6 +223,18 @@ int wmain(const int argumentCount, wchar_t** arguments)
           xeo3::kCurrentAbiVersion);
     CHECK(options[0] == 1);
     CHECK(options[1] == xeo3::kCurrentAbiVersion);
+    CHECK(*synchronousQueueEnabled == 1);
+    CHECK(*importCountersEnabled == 0);
+    CHECK(*integerImportSyncEnabled == 0);
+    CHECK(*guestIarTelemetryEnabled == 0);
+    CHECK(*continuousStatePublicationMode == 0);
+    CHECK(*fastIrqlEnabled == 0);
+    CHECK(*fastIrqlTelemetryEnabled == 0);
+    CHECK(*functionLookupEntryCount == 0x002A8000);
+    for (std::size_t index = 0; index < *importCounterCount; ++index)
+    {
+        CHECK(importCounts[index] == 0);
+    }
     CHECK(mappings != nullptr);
     std::fprintf(
         stderr,

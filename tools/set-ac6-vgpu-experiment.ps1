@@ -7,6 +7,10 @@ param(
         'HostTransfer',
         'HostRestoreSkip',
         'FullscreenScissor',
+        'MsaaViewport',
+        'Ground',
+        'Reciprocal',
+        'WaveBallot',
         'VposScale',
         'Exposure',
         'EdramScale',
@@ -59,6 +63,10 @@ $exportName = switch ($Experiment) {
     'HostTransfer' { 'BridgeVgpuHostTransferExperimentSelector' }
     'HostRestoreSkip' { 'BridgeVgpuHostEdramRestoreDrawSkipEnabled' }
     'FullscreenScissor' { 'BridgeVgpuFullscreenScissorFixEnabled' }
+    'MsaaViewport' { 'BridgeVgpuMsaaViewportFixEnabled' }
+    'Ground' { 'BridgeVgpuGroundFixEnabled' }
+    'Reciprocal' { 'BridgeVgpuReciprocalFixEnabled' }
+    'WaveBallot' { 'BridgeVgpuWaveBallotFixEnabled' }
     'VposScale' { 'BridgeVgpuVposScaleFixEnabled' }
     'Exposure' { 'BridgeVgpuExposureFixEnabled' }
     'EdramScale' { 'BridgeVgpuEdramScaleFixEnabled' }

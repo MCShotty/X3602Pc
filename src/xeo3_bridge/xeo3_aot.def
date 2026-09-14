@@ -6,8 +6,53 @@ EXPORTS
     PrecompiledPointers @4 DATA
     BridgeDispatchCount DATA
     BridgeImportCount DATA
+    BridgeVdSwapTraceEnabled DATA
+    BridgeVdSwapTraceCount DATA
+    BridgeVdSwapTraceFailure DATA
+    BridgeImportCountersEnabled DATA
+    BridgeImportCounterCount DATA
+    BridgeImportCounts DATA
+    BridgeFunctionLookupEntryCount DATA
+    BridgeIntegerImportSyncEnabled DATA
+    BridgeIntegerImportSyncAttemptCount DATA
+    BridgeIntegerImportSyncHitCount DATA
+    BridgeIntegerImportSyncFallbackCount DATA
+    BridgeIntegerImportSyncLastThunk DATA
     BridgeEventTraceEnabled DATA
     BridgeThreadImportTraceEnabled DATA
+    BridgeFastSynchronizationTelemetryEnabled DATA
+    BridgeFastCriticalSectionsEnabled DATA
+    BridgeFastCriticalSectionAttemptCount DATA
+    BridgeFastCriticalSectionHitCount DATA
+    BridgeFastCriticalSectionFallbackCount DATA
+    BridgeFastCriticalSectionSignalCount DATA
+    BridgeFastCriticalSectionLastThunk DATA
+    BridgeFastCriticalSectionLastAddress DATA
+    BridgeFastCriticalSectionLastThread DATA
+    BridgeFastCriticalSectionLastDisposition DATA
+    BridgeFastSpinLocksEnabled DATA
+    BridgeFastSpinLockAttemptCount DATA
+    BridgeFastSpinLockHitCount DATA
+    BridgeFastSpinLockFallbackCount DATA
+    BridgeFastSpinLockContentionCount DATA
+    BridgeFastSpinLockLastThunk DATA
+    BridgeFastSpinLockLastAddress DATA
+    BridgeFastIrqlEnabled DATA
+    BridgeFastIrqlTelemetryEnabled DATA
+    BridgeFastIrqlAttemptCount DATA
+    BridgeFastIrqlHitCount DATA
+    BridgeFastIrqlNativeFallbackCount DATA
+    BridgeFastIrqlInvalidFallbackCount DATA
+    BridgeFastIrqlLastThunk DATA
+    BridgeFastIrqlLastOldIrql DATA
+    BridgeFastIrqlLastNewIrql DATA
+    BridgeFastIrqlLastPendingIrql DATA
+    BridgeRaiseIrqlOldPassiveCount DATA
+    BridgeRaiseIrqlOldApcCount DATA
+    BridgeRaiseIrqlOldDispatchCount DATA
+    BridgeRaiseIrqlUnexpectedCount DATA
+    BridgeIndirectTelemetryEnabled DATA
+    BridgeIndirectStateSyncEnabled DATA
     BridgeIndirectCallCount DATA
     BridgeLastIndirectTarget DATA
     BridgeLastIndirectCallerIar DATA
@@ -46,6 +91,39 @@ EXPORTS
     BridgeActiveWorkerPrimaryClaimCount DATA
     BridgeLastWorkerDestroyTarget DATA
     BridgeLastWorkerDestroyObject DATA
+    BridgeAc6AudioPollClockFallbackEnabled DATA
+    BridgeAc6AudioPollTraceEnabled DATA
+    BridgeGuestIarTelemetryEnabled DATA
+    BridgeContinuousStatePublicationMode DATA
+    BridgeAc6AudioPollCallCount DATA
+    BridgeAc6AudioPollReturnCount DATA
+    BridgeAc6AudioPollSampleCount DATA
+    BridgeAc6AudioPollContinueCount DATA
+    BridgeAc6AudioPollTimeoutCount DATA
+    BridgeAc6AudioPollExitCount DATA
+    BridgeAc6AudioPollTimeBaseSampleCount DATA
+    BridgeAc6AudioPollClockFallbackCount DATA
+    BridgeAc6AudioPollDelayCount DATA
+    BridgeAc6AudioPollLastGuestIar DATA
+    BridgeAc6AudioPollLastThreadId DATA
+    BridgeAc6AudioPollLastObject DATA
+    BridgeAc6AudioPollLastFrame DATA
+    BridgeAc6AudioPollLastGuestMemory DATA
+    BridgeAc6AudioPollLastTimeBase DATA
+    BridgeAc6AudioPollLastGlobalTick DATA
+    BridgeAc6AudioPollLastGlobalClock DATA
+    BridgeAc6AudioPollLastObjectClock DATA
+    BridgeAc6AudioPollLastBaselineTick DATA
+    BridgeAc6AudioPollLastDelta DATA
+    BridgeAc6AudioPollLastConsumerPointer DATA
+    BridgeAc6AudioPollLastConsumerValue DATA
+    BridgeAc6AudioPollLastObservedConsumer DATA
+    BridgeAc6AudioPollLastRequiredDistance DATA
+    BridgeAc6AudioPollLastAvailableDistance DATA
+    BridgeAc6AudioPollLastReturn DATA
+    BridgeAc6AudioPollLastResolvedTick DATA
+    BridgeSynchronousQueueEnabled DATA
+    BridgeSynchronousQueueBypassCount DATA
     BridgeSynchronousQueueSubmitCount DATA
     BridgeSynchronousQueueTaskCount DATA
     BridgeSynchronousQueueFailureCount DATA
@@ -163,15 +241,34 @@ EXPORTS
     BridgeVgpuShaderCompileCount DATA
     BridgeVgpuLastCompiledShaderSize DATA
     BridgeVgpuShaderCaptureFailure DATA
+    BridgeVgpuXenosTranslateHookInstalled DATA
+    BridgeVgpuXenosTranslateHookFailure DATA
+    BridgeVgpuXenosTranslateCount DATA
+    BridgeVgpuXenosUcodeCaptureCount DATA
+    BridgeVgpuXenosUcodeCaptureFailure DATA
+    BridgeVgpuXenosShaderMapFailure DATA
+    BridgeVgpuXenosLastStage DATA
+    BridgeVgpuXenosLastUcodeSize DATA
+    BridgeVgpuXenosLastUcodeHash0 DATA
+    BridgeVgpuXenosLastUcodeHash1 DATA
+    BridgeVgpuXenosLastUcodeHash2 DATA
+    BridgeVgpuXenosLastUcodeHash3 DATA
     BridgeVgpuVertexShaderCompileCount DATA
     BridgeVgpuLastVertexShaderSize DATA
     BridgeVgpuVertexShaderCaptureFailure DATA
     BridgeVgpuGroundFixShaderCount DATA
     BridgeVgpuGroundFixFetchCount DATA
     BridgeVgpuGroundFixFailure DATA
+    BridgeVgpuGroundFixEnabled DATA
     BridgeVgpuReciprocalFixShaderCount DATA
     BridgeVgpuReciprocalFixInstructionCount DATA
     BridgeVgpuReciprocalFixFailure DATA
+    BridgeVgpuReciprocalFixEnabled DATA
+    BridgeVgpuWaveBallotFingerprintMatchCount DATA
+    BridgeVgpuWaveBallotFixShaderCount DATA
+    BridgeVgpuWaveBallotFixSiteCount DATA
+    BridgeVgpuWaveBallotFixFailure DATA
+    BridgeVgpuWaveBallotFixEnabled DATA
     BridgeVgpuVposFixShaderCount DATA
     BridgeVgpuVposFixSiteCount DATA
     BridgeVgpuVposFixFailure DATA
@@ -185,12 +282,21 @@ EXPORTS
     BridgeVgpuTextureEndianFixBudget DATA
     BridgeVgpuTextureEndianReplacement DATA
     BridgeVgpuTextureEndianFixCount DATA
+    BridgeVgpuTexturePreviewEndianFixCount DATA
     BridgeVgpuTextureEndianSignatureMatchCount DATA
     BridgeVgpuTextureEndianLastMatchCall DATA
     BridgeVgpuTextureEndianLastPatchedCall DATA
     BridgeVgpuTextureTransferCallCount DATA
     BridgeVgpuConstantUploadCallCount DATA
     BridgeVgpuConstantUpload128Count DATA
+    BridgeVgpuConstantUploadContextCount DATA
+    BridgeVgpuConstantUploadContextFailureCount DATA
+    BridgeVgpuConstantUploadLastContext DATA
+    BridgeVgpuConstantUploadLastCpuBase DATA
+    BridgeVgpuConstantUploadLastGpuBase DATA
+    BridgeVgpuConstantUploadLastStride DATA
+    BridgeVgpuConstantUploadLastSlotCount DATA
+    BridgeVgpuConstantUploadLastMappedSpan DATA
     BridgeVgpuTransfer341WidthFixEnabled DATA
     BridgeVgpuTransfer341PipelineReplacementEnabled DATA
     BridgeVgpuTransfer341WidthCandidateCount DATA
@@ -265,6 +371,13 @@ EXPORTS
     BridgeVgpuPipelineStreamLastCreateOutput DATA
     BridgeVgpuSuppressedEdramRestorePsoCount DATA
     BridgeVgpuEdramRestoreFingerprintCount DATA
+    BridgeVgpuPso535CullFixEnabled DATA
+    BridgeVgpuPso535CullCandidateCount DATA
+    BridgeVgpuPso535CullFingerprintMatchCount DATA
+    BridgeVgpuPso535CullFixPipelineCount DATA
+    BridgeVgpuPso535CullFixFailure DATA
+    BridgeVgpuPso535CullLastOriginalMode DATA
+    BridgeVgpuPso535CullLastReplacementMode DATA
     BridgeVgpuEdramScaleFixEnabled DATA
     BridgeVgpuEdramScaleCandidateCount DATA
     BridgeVgpuEdramScaleFingerprintMatchCount DATA
@@ -303,6 +416,17 @@ EXPORTS
     BridgeVgpuEdramLoadDrawOriginalPipelineState DATA
     BridgeVgpuEdramLoadDrawReplacementPipelineState DATA
     BridgeVgpuEdramDrawRootSignature DATA
+    BridgeVgpuPixEdramBoundMatchCount DATA
+    BridgeVgpuPixEdramBoundRejectCount DATA
+    BridgeVgpuPixEdramResolveFailure DATA
+    BridgeVgpuRtvHookInstalled DATA
+    BridgeVgpuRtvHookFailure DATA
+    BridgeVgpuPixDescriptorCopyCount DATA
+    BridgeVgpuPixConstantCopyCount DATA
+    BridgeVgpuPixDescriptorHookFailure DATA
+    BridgeVgpuG2HTraceEnabled DATA
+    BridgeVgpuG2HTraceCount DATA
+    BridgeVgpuG2HTraceFailure DATA
     BridgeVgpuEdramDrawRootSignatureMismatchCount DATA
     BridgeVgpuEdramDrawFingerprintCandidateCount DATA
     BridgeVgpuEdramDrawFingerprintQueryCount DATA
@@ -324,6 +448,57 @@ EXPORTS
     BridgeVgpuHostCommandListResetLastInitialPipelineState DATA
     BridgeVgpuHostCommandListResetLastResult DATA
     BridgeVgpuHostDrawCallCount DATA
+    BridgeVgpuRestartTerrainPipelineCount DATA
+    BridgeVgpuRestartSkyPipelineCount DATA
+    BridgeVgpuRestartPipelineOverflowCount DATA
+    BridgeVgpuRestartTerrainDrawCount DATA
+    BridgeVgpuRestartSkyDrawCount DATA
+    BridgeVgpuRestartTerrainStartVertexZeroCount DATA
+    BridgeVgpuRestartTerrainStartVertexNonZeroCount DATA
+    BridgeVgpuRestartSkyStartVertexZeroCount DATA
+    BridgeVgpuRestartSkyStartVertexNonZeroCount DATA
+    BridgeVgpuRestartTerrainLastVertexCount DATA
+    BridgeVgpuRestartTerrainLastStartVertex DATA
+    BridgeVgpuRestartTerrainMaxStartVertex DATA
+    BridgeVgpuRestartSkyLastVertexCount DATA
+    BridgeVgpuRestartSkyLastStartVertex DATA
+    BridgeVgpuRestartSkyMaxStartVertex DATA
+    BridgeVgpuRestartLastClassification DATA
+    BridgeVgpuRestartLastPipelineState DATA
+    BridgeVgpuRestartLastInstanceCount DATA
+    BridgeVgpuRestartLastStartInstance DATA
+    BridgeVgpuRestartLastThreadId DATA
+    BridgeVgpuRestartLastDrawCall DATA
+    BridgeVgpuRestartConstantResolveCount DATA
+    BridgeVgpuRestartConstantResolveFailureCount DATA
+    BridgeVgpuRestartLastResolveFailure DATA
+    BridgeVgpuRestartLastRootDescriptorTable DATA
+    BridgeVgpuRestartLastDescriptorHeapGpuStart DATA
+    BridgeVgpuRestartLastDescriptorHeapCpuStart DATA
+    BridgeVgpuRestartLastDescriptorHeapByteSpan DATA
+    BridgeVgpuRestartLastDescriptorHeapIncrement DATA
+    BridgeVgpuRestartLastCpuDescriptor DATA
+    BridgeVgpuRestartLastDescriptorWord0 DATA
+    BridgeVgpuRestartLastDescriptorWord1 DATA
+    BridgeVgpuRestartLastDecodedGpuAddress DATA
+    BridgeVgpuRestartLastUploadContextKind DATA
+    BridgeVgpuRestartStartMatchesVertexOffsetCount DATA
+    BridgeVgpuRestartStartMismatchesVertexOffsetCount DATA
+    BridgeVgpuRestartLastConstantGpuAddress DATA
+    BridgeVgpuRestartLastConstantCpuAddress DATA
+    BridgeVgpuRestartLastVertexOffsetBits DATA
+    BridgeVgpuRestartLastUseIndexBuffer DATA
+    BridgeVgpuRestartLastIndexCount DATA
+    BridgeVgpuRestartLastVfetchEndianness DATA
+    BridgeVgpuRestartLastPackedIbDesc DATA
+    BridgeVgpuRestartLastResetIndex DATA
+    BridgeVgpuRestartLastIbBase DATA
+    BridgeVgpuRestartTerrainLastVertexOffsetBits DATA
+    BridgeVgpuRestartTerrainLastIndexCount DATA
+    BridgeVgpuRestartTerrainLastPackedIbDesc DATA
+    BridgeVgpuRestartSkyLastVertexOffsetBits DATA
+    BridgeVgpuRestartSkyLastIndexCount DATA
+    BridgeVgpuRestartSkyLastPackedIbDesc DATA
     BridgeVgpuHostTransferDrawCount DATA
     BridgeVgpuHostTransferExperimentSelector DATA
     BridgeVgpuHostTransferLastCandidate DATA
@@ -349,6 +524,14 @@ EXPORTS
     BridgeVgpuFullscreenScissorFixEnabled DATA
     BridgeVgpuFullscreenScissorFixCount DATA
     BridgeVgpuFullscreenScissorFixFailure DATA
+    BridgeVgpuMsaaViewportFixEnabled DATA
+    BridgeVgpuMsaaViewportCandidateCount DATA
+    BridgeVgpuMsaaViewportFixCount DATA
+    BridgeVgpuMsaaViewportFixFailure DATA
+    BridgeVgpuMsaaViewportLastPipelineState DATA
+    BridgeVgpuMsaaViewportLastOriginalWidthBits DATA
+    BridgeVgpuMsaaViewportLastReplacementWidthBits DATA
+    BridgeVgpuMsaaViewportLastVertexCount DATA
     BridgeVgpuEdramRestoreDrawCandidateCount DATA
     BridgeVgpuEdramRestoreDrawSkipCount DATA
     BridgeVgpuEdramRestoreDrawHashMismatchCount DATA
@@ -389,6 +572,10 @@ EXPORTS
     BridgeVgpuPipelineStateCreateFailureCount DATA
     BridgeVgpuPipelineStateLastCreateResult DATA
     BridgeVgpuPipelineStateLastCreateOutput DATA
+    BridgeVgpuPipelineStateLastFailureResult DATA
+    BridgeVgpuAircraftRestartShaderCount DATA
+    BridgeVgpuShadowRestartShaderCount DATA
+    BridgeVgpuPipelineStateLastFailureCreateSequence DATA
     BridgeVgpuNullPipelineStateGuardInstalled DATA
     BridgeVgpuNullPipelineStateGuardFailure DATA
     BridgeVgpuNullPipelineStateSkipCount DATA

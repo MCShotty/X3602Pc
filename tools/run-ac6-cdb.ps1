@@ -3,10 +3,14 @@ param(
     [string]$DvdRoot = 'D:\XeO3AC6DVD',
     [string]$TracePath,
     [string]$CommandFile,
+    [ValidatePattern('^[A-Za-z0-9_.-]{1,80}$')]
+    [string]$LocalPipe,
     [switch]$ReuseCompatibleShaderCache
 )
 
 $ErrorActionPreference = 'Stop'
+$validatedHost = & (Join-Path $PSScriptRoot 'test-ac6-host-profile.ps1') `
+    -LabRoot $LabRoot -DvdRoot $DvdRoot
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $packageName = 'Xbox360BackwardCompatibil.PrimaryFuzionFrenzyFuzio'
@@ -68,36 +72,38 @@ $configText = [System.Text.RegularExpressions.Regex]::Replace($configText, '\r?\
     (New-Object System.Text.UTF8Encoding($false))
 )
 
-New-Item -ItemType Directory -Path (Join-Path $LabRoot 'Storage') -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $LabRoot 'XeO3_ShaderCache') -Force | Out-Null
-$cacheState = if ($ReuseCompatibleShaderCache) {
-    $compatibleCache = Join-Path (
-        Join-Path $LabRoot 'Storage\ShaderCache\XeO3_ShaderCache'
-    ) '4E4D07D1'
-    $cacheFiles = @(
-        Get-ChildItem -LiteralPath $compatibleCache -Recurse -File `
-            -ErrorAction SilentlyContinue
-    )
-    if ($cacheFiles.Count -eq 0) {
-        throw "The compatible AC6 shader cache is empty: $compatibleCache"
-    }
-    [pscustomobject]@{
-        CachePath = $compatibleCache
-        Files = $cacheFiles.Count
-        Reused = $true
-    }
-} else {
-    & $prepareShaderCache `
-        -LabRoot $LabRoot `
-        -DvdRoot $DvdRoot `
-        -ConfigPath $configSource
+$storageRoot = Join-Path $LabRoot 'Storage'
+$shaderCacheRoot = Join-Path $LabRoot 'XeO3_ShaderCache'
+$writableShaderCacheRoot = Join-Path $storageRoot 'ShaderCache\XeO3_ShaderCache'
+New-Item -ItemType Directory -Path $storageRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $shaderCacheRoot -Force | Out-Null
+New-Item -ItemType Directory -Path $writableShaderCacheRoot -Force | Out-Null
+$writableCacheState = & $prepareShaderCache `
+    -LabRoot $LabRoot `
+    -DvdRoot $DvdRoot `
+    -ConfigPath $configSource `
+    -ShaderCacheRoot $writableShaderCacheRoot `
+    -VgpuPath $validatedHost.VgpuPath -KernelAotPath $validatedHost.KernelAotPath
+$sourceCacheState = & $prepareShaderCache `
+    -LabRoot $LabRoot `
+    -DvdRoot $DvdRoot `
+    -ConfigPath $configSource `
+    -ShaderCacheRoot $shaderCacheRoot `
+    -VgpuPath $validatedHost.VgpuPath -KernelAotPath $validatedHost.KernelAotPath
+$cacheState = [pscustomobject]@{
+    ReuseCompatibleRequested = [bool]$ReuseCompatibleShaderCache
+    Writable = $writableCacheState
+    Source = $sourceCacheState
 }
 $package = Get-AppxPackage -Name $packageName -ErrorAction Stop
 $emu = Join-Path $LabRoot 'Emu.exe'
-$storageRoot = Join-Path $LabRoot 'Storage'
-$shaderCacheRoot = Join-Path $LabRoot 'XeO3_ShaderCache'
 $emuArguments = "dvd `"$DvdRoot`" root `"$LabRoot`" systemfiles `"$LabRoot`" storage `"$storageRoot`" shadercache `"$shaderCacheRoot`""
 $debuggerArguments = "-o -G -logo `"$TracePath`" -cf `"$commandFile`" `"$emu`" $emuArguments"
+if ($LocalPipe) {
+    # A local named-pipe debugger transport permits headless inspection and
+    # continuation without automating a terminal window or exposing a TCP port.
+    $debuggerArguments = "-server npipe:pipe=$LocalPipe $debuggerArguments"
+}
 
 Push-Location $LabRoot
 try {
@@ -114,6 +120,7 @@ try {
 [pscustomobject]@{
     TracePath = $TracePath
     Cdb = $cdb
+    LocalPipe = $LocalPipe
     PackageFamilyName = $package.PackageFamilyName
     ShaderCache = $cacheState
 } | Format-List

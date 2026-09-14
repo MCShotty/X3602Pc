@@ -3,6 +3,8 @@ param(
     [string]$OutputPath = 'out\pix\ac6-frame.wpix',
     [ValidateRange(1, 16)]
     [uint32]$FrameCount = 1,
+    [ValidateRange(15, 300)]
+    [int]$CaptureTimeoutSeconds = 120,
     [string]$PixToolPath =
         'C:\Program Files\Microsoft PIX\2603.25\pixtool.exe'
 )
@@ -23,9 +25,17 @@ $resolvedOutput = if ([System.IO.Path]::IsPathRooted($OutputPath)) {
     Join-Path $repoRoot $OutputPath
 }
 $outputDirectory = [System.IO.Path]::GetDirectoryName($resolvedOutput)
+if (Test-Path -LiteralPath $resolvedOutput) {
+    throw "Refusing to overwrite an existing PIX capture: $resolvedOutput"
+}
 if ($outputDirectory) {
     New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 }
+$durableOutput = $resolvedOutput
+# Treat CaptureNextFrame's file as session-owned. Return an independent,
+# verified copy so PIX's session lifecycle cannot invalidate the caller's file.
+$resolvedOutput = Join-Path $outputDirectory (
+    '.ac6-pix-session-' + [Guid]::NewGuid().ToString('N') + '.wpix')
 
 $targetProcess = if ($TargetProcessId -eq 0) {
     Get-Process -Name Emu -ErrorAction Stop |
@@ -304,16 +314,73 @@ if ($result -ne 0) {
     throw "CaptureNextFrame failed with HRESULT 0x$($result.ToString('X8'))."
 }
 
-$deadline = (Get-Date).AddSeconds(60)
+$deadline = [DateTime]::UtcNow.AddSeconds($CaptureTimeoutSeconds)
+$lastLength = [long]-1
+$lastWriteUtc = [DateTime]::MinValue
+$stableSinceUtc = [DateTime]::MinValue
+$captureReady = $false
 do {
-    if ((Test-Path -LiteralPath $resolvedOutput) -and
-        (Get-Item -LiteralPath $resolvedOutput).Length -gt 1024) {
-        break
+    # PIX creates a 1088-byte header before recording the frame. Existence and
+    # length > 1024 used to report success while the capture was still empty.
+    # Require a settled file and an open that excludes concurrent writers.
+    if (Test-Path -LiteralPath $resolvedOutput) {
+        $capture = Get-Item -LiteralPath $resolvedOutput
+        if ($capture.Length -gt 4096) {
+            if ($capture.Length -eq $lastLength -and
+                $capture.LastWriteTimeUtc -eq $lastWriteUtc) {
+                if (([DateTime]::UtcNow - $stableSinceUtc).TotalSeconds -ge 1) {
+                    $stream = $null
+                    try {
+                        $stream = [IO.File]::Open($resolvedOutput,
+                            [IO.FileMode]::Open, [IO.FileAccess]::Read,
+                            [IO.FileShare]::Read)
+                        $captureReady = $stream.Length -eq $lastLength
+                    } catch [IO.IOException] {
+                        # A writer may still own the file even if its size has
+                        # not changed during this polling interval.
+                    } finally {
+                        if ($stream) { $stream.Dispose() }
+                    }
+                    if ($captureReady) { break }
+                }
+            } else {
+                $lastLength = $capture.Length
+                $lastWriteUtc = $capture.LastWriteTimeUtc
+                $stableSinceUtc = [DateTime]::UtcNow
+            }
+        }
     }
     Start-Sleep -Milliseconds 250
-} while ((Get-Date) -lt $deadline)
-if (-not (Test-Path -LiteralPath $resolvedOutput)) {
-    throw 'PIX did not create the requested capture within 60 seconds.'
+} while ([DateTime]::UtcNow -lt $deadline)
+if (-not $captureReady) {
+    throw "PIX capture did not finish within $CaptureTimeoutSeconds seconds. The target is left running for inspection."
 }
 
-Get-Item -LiteralPath $resolvedOutput
+$completedCapture = Get-Item -LiteralPath $resolvedOutput
+$captureStream = $null
+$durableStream = $null
+$captureHasher = $null
+$captureHash = $null
+try {
+    $captureStream = [IO.File]::Open($resolvedOutput, [IO.FileMode]::Open,
+        [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $durableStream = [IO.File]::Open($durableOutput, [IO.FileMode]::CreateNew,
+        [IO.FileAccess]::Write, [IO.FileShare]::None)
+    $captureStream.CopyTo($durableStream)
+    $durableStream.Flush($true)
+    $captureStream.Position = 0
+    $captureHasher = [Security.Cryptography.SHA256]::Create()
+    $captureHash = [BitConverter]::ToString(
+        $captureHasher.ComputeHash($captureStream)).Replace('-', '')
+} finally {
+    if ($captureHasher) { $captureHasher.Dispose() }
+    if ($durableStream) { $durableStream.Dispose() }
+    if ($captureStream) { $captureStream.Dispose() }
+}
+$durableCapture = Get-Item -LiteralPath $durableOutput
+if ($durableCapture.Length -ne $completedCapture.Length -or
+    $captureHash -ne
+    (Get-FileHash -LiteralPath $durableOutput -Algorithm SHA256).Hash) {
+    throw "Durable PIX capture verification failed: $durableOutput"
+}
+$durableCapture

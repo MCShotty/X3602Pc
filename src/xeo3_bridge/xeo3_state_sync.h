@@ -19,6 +19,12 @@ struct TranslatedState
 
 void CopyFromXeO3(CpuStateView source, TranslatedState& destination) noexcept;
 void CopyToXeO3(TranslatedState& source, CpuStateView destination) noexcept;
+void CopyIntegerFromXeO3(
+    CpuStateView source,
+    TranslatedState& destination) noexcept;
+void CopyIntegerToXeO3(
+    TranslatedState& source,
+    CpuStateView destination) noexcept;
 void SetTranslatedIar(
     TranslatedState& state,
     std::uint32_t guestIar) noexcept;

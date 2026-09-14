@@ -1,0 +1,298 @@
+diff --git a/XenosRecomp/main.cpp b/XenosRecomp/main.cpp
+index d015145..5840e85 100644
+--- a/XenosRecomp/main.cpp
++++ b/XenosRecomp/main.cpp
+@@ -21,29 +21,127 @@ static void writeAllBytes(const char* filePath, const void* data, size_t dataSiz
+     fclose(file);
+ }
+ 
++static void storeBigEndian32(std::vector<uint8_t>& data, size_t offset,
++    uint32_t value)
++{
++    data[offset] = uint8_t(value >> 24);
++    data[offset + 1] = uint8_t(value >> 16);
++    data[offset + 2] = uint8_t(value >> 8);
++    data[offset + 3] = uint8_t(value);
++}
++
++static std::vector<uint8_t> buildRawShaderContainer(
++    const uint8_t* ucode, size_t ucodeSize, bool pixelShader)
++{
++    constexpr uint32_t interpolatorCount = 16;
++    constexpr size_t constantTableOffset = sizeof(ShaderContainer);
++    constexpr size_t shaderOffset =
++        constantTableOffset + sizeof(ConstantTableContainer);
++    constexpr size_t shaderMetadataSize =
++        sizeof(Shader) + 2 * sizeof(uint32_t) +
++        interpolatorCount * sizeof(uint32_t);
++    constexpr size_t virtualSize = shaderOffset + shaderMetadataSize;
++
++    static_assert(sizeof(ShaderContainer) == 36);
++    static_assert(sizeof(ConstantTableContainer) == 32);
++    static_assert(sizeof(Shader) == 24);
++
++    std::vector<uint8_t> container(virtualSize + ucodeSize);
++    storeBigEndian32(container, 0, 0x102A1100U | (pixelShader ? 0U : 1U));
++    storeBigEndian32(container, 4, uint32_t(virtualSize));
++    storeBigEndian32(container, 8, uint32_t(ucodeSize));
++    storeBigEndian32(container, 16, uint32_t(constantTableOffset));
++    storeBigEndian32(container, 20, 0);
++    storeBigEndian32(container, 24, uint32_t(shaderOffset));
++
++    storeBigEndian32(container, constantTableOffset,
++        uint32_t(sizeof(ConstantTableContainer)));
++    storeBigEndian32(container, constantTableOffset + 4,
++        uint32_t(sizeof(ConstantTable)));
++
++    storeBigEndian32(container, shaderOffset, 0);
++    storeBigEndian32(container, shaderOffset + 4, uint32_t(ucodeSize));
++    storeBigEndian32(container, shaderOffset + 12,
++        pixelShader ? 0x0000FF00U : 0U);
++    storeBigEndian32(container, shaderOffset + 20,
++        interpolatorCount << 5);
++    storeBigEndian32(container, shaderOffset + 24, 0);
++    storeBigEndian32(container, shaderOffset + 28,
++        pixelShader ? uint32_t(PIXEL_SHADER_OUTPUT_COLOR0 |
++                               PIXEL_SHADER_OUTPUT_COLOR1 |
++                               PIXEL_SHADER_OUTPUT_COLOR2 |
++                               PIXEL_SHADER_OUTPUT_COLOR3 |
++                               PIXEL_SHADER_OUTPUT_DEPTH)
++                    : 0U);
++
++    for (uint32_t i = 0; i < interpolatorCount; ++i)
++    {
++        const uint32_t interpolator =
++            i | (uint32_t(DeclUsage::TexCoord) << 4) | (i << 8);
++        storeBigEndian32(container, shaderOffset + 32 + i * 4,
++            interpolator);
++    }
++
++    memcpy(container.data() + virtualSize, ucode, ucodeSize);
++    return container;
++}
++
+ struct RecompiledShader
+ {
+     uint8_t* data = nullptr;
++    std::string sourcePath;
++    size_t sourceOffset = 0;
++    size_t sourceSize = 0;
++    XXH64_hash_t ucodeHash = 0;
++    uint32_t ucodeDwordCount = 0;
+     IDxcBlob* dxil = nullptr;
+     std::vector<uint8_t> spirv;
+     uint32_t specConstantsMask = 0;
+ };
+ 
++#ifdef _WIN32
++static DWORD recompileShaderSafely(ShaderRecompiler* recompiler,
++    const uint8_t* shaderData, const std::string_view* include) noexcept
++{
++    DWORD exceptionCode = ERROR_SUCCESS;
++    __try
++    {
++        recompiler->recompile(shaderData, *include);
++    }
++    __except ((exceptionCode = GetExceptionCode(), EXCEPTION_EXECUTE_HANDLER))
++    {
++    }
++    return exceptionCode;
++}
++#endif
++
+ int main(int argc, char** argv)
+ {
+ #ifndef XENOS_RECOMP_INPUT
+-    if (argc < 4)
++    const bool hlslDirectoryMode = argc >= 2 && strcmp(argv[1], "--hlsl-dir") == 0;
++    const bool indexMode = argc >= 2 && strcmp(argv[1], "--index") == 0;
++    const bool rawUcodeMode = argc >= 2 && strcmp(argv[1], "--raw-ucode") == 0;
++    if ((!hlslDirectoryMode && !indexMode && !rawUcodeMode && argc < 4) ||
++        (hlslDirectoryMode && argc < 5) || (indexMode && argc < 4) ||
++        (rawUcodeMode && argc < 5))
+     {
+-        printf("Usage: XenosRecomp [input path] [output path] [shader common header file path]");
++        printf("Usage: XenosRecomp [input path] [output path] [shader common header file path]\n"
++               "       XenosRecomp --hlsl-dir [input path] [output directory] [shader common header file path]\n"
++               "       XenosRecomp --index [input path] [output TSV]\n"
++               "       XenosRecomp --raw-ucode [input path] [vertex|pixel] [output HLSL] [common header]");
+         return 0;
+     }
++#else
++    constexpr bool hlslDirectoryMode = false;
++    constexpr bool indexMode = false;
++    constexpr bool rawUcodeMode = false;
+ #endif
+ 
+     const char* input =
+ #ifdef XENOS_RECOMP_INPUT 
+         XENOS_RECOMP_INPUT
+ #else
+-        argv[1]
++        argv[(hlslDirectoryMode || indexMode || rawUcodeMode) ? 2 : 1]
+ #endif
+     ;
+ 
+@@ -51,7 +149,7 @@ int main(int argc, char** argv)
+ #ifdef XENOS_RECOMP_OUTPUT 
+         XENOS_RECOMP_OUTPUT
+ #else
+-        argv[2]
++        argv[rawUcodeMode ? 4 : (hlslDirectoryMode || indexMode) ? 3 : 2]
+ #endif
+         ;
+     
+@@ -59,13 +157,72 @@ int main(int argc, char** argv)
+ #ifdef XENOS_RECOMP_INCLUDE_INPUT
+         XENOS_RECOMP_INCLUDE_INPUT
+ #else
+-        argv[3]
++        indexMode ? nullptr :
++        rawUcodeMode ? (argc >= 6 ? argv[5] : nullptr) :
++        argv[hlslDirectoryMode ? 4 : 3]
+ #endif
+         ;
+ 
+     size_t includeSize = 0;
+-    auto includeData = readAllBytes(includeInput, includeSize);
+-    std::string_view include(reinterpret_cast<const char*>(includeData.get()), includeSize);
++    std::unique_ptr<uint8_t[]> includeData;
++    std::string_view include;
++    if (!indexMode && includeInput != nullptr)
++    {
++        includeData = readAllBytes(includeInput, includeSize);
++        include = std::string_view(reinterpret_cast<const char*>(includeData.get()), includeSize);
++    }
++
++    if (rawUcodeMode)
++    {
++        constexpr size_t maximumRawUcodeSize = 1024 * 1024;
++        const bool pixelShader = strcmp(argv[3], "pixel") == 0;
++        if (!pixelShader && strcmp(argv[3], "vertex") != 0)
++        {
++            fmt::println(stderr, "Raw shader stage must be vertex or pixel.");
++            return 2;
++        }
++
++        size_t ucodeSize = 0;
++        auto ucode = readAllBytes(input, ucodeSize);
++        if (ucodeSize == 0 || ucodeSize > maximumRawUcodeSize ||
++            (ucodeSize % 12) != 0)
++        {
++            fmt::println(stderr,
++                "Raw shader size must be nonzero, at most {} bytes, and divisible by 12; got {}.",
++                maximumRawUcodeSize, ucodeSize);
++            return 2;
++        }
++
++        auto container = buildRawShaderContainer(
++            ucode.get(), ucodeSize, pixelShader);
++        ShaderRecompiler recompiler;
++#ifdef _WIN32
++        const auto exceptionCode =
++            recompileShaderSafely(&recompiler, container.data(), &include);
++        if (exceptionCode != ERROR_SUCCESS)
++        {
++            fmt::println(stderr,
++                "Raw shader recompilation failed with exception 0x{:08X}.",
++                exceptionCode);
++            return 3;
++        }
++#else
++        recompiler.recompile(container.data(), include);
++#endif
++        constexpr size_t maximumHlslSize = 16 * 1024 * 1024;
++        if (recompiler.out.empty() || recompiler.out.size() > maximumHlslSize)
++        {
++            fmt::println(stderr,
++                "Raw shader generated an invalid HLSL size of {} bytes.",
++                recompiler.out.size());
++            return 4;
++        }
++        writeAllBytes(output, recompiler.out.data(), recompiler.out.size());
++        fmt::println("Recompiled {} {} shader bytes to {} HLSL bytes.",
++            ucodeSize, pixelShader ? "pixel" : "vertex",
++            recompiler.out.size());
++        return 0;
++    }
+ 
+     if (std::filesystem::is_directory(input))
+     {
+@@ -98,6 +255,21 @@ int main(int argc, char** argv)
+                     if (shader.second)
+                     {
+                         shader.first->second.data = fileData.get() + i;
++                        shader.first->second.sourcePath = file.path().string();
++                        shader.first->second.sourceOffset = i;
++                        shader.first->second.sourceSize = dataSize;
++                        const auto shaderInfo = reinterpret_cast<const Shader*>(
++                            fileData.get() + i + shaderContainer->shaderOffset);
++                        const size_t ucodeOffset = shaderContainer->virtualSize +
++                            shaderInfo->physicalOffset;
++                        const size_t ucodeSize = size_t(shaderInfo->size);
++                        if (ucodeOffset <= dataSize && ucodeSize <= dataSize - ucodeOffset)
++                        {
++                            shader.first->second.ucodeHash = XXH3_64bits(
++                                fileData.get() + i + ucodeOffset, ucodeSize);
++                            shader.first->second.ucodeDwordCount =
++                                uint32_t(ucodeSize / sizeof(uint32_t));
++                        }
+                         foundAny = true;
+                     }
+ 
+@@ -113,6 +285,55 @@ int main(int argc, char** argv)
+                 files.emplace_back(std::move(fileData));
+         }
+ 
++        if (indexMode)
++        {
++            StringBuffer f;
++            f.println("xxh3_64\tucode_xxh3_64\tucode_dwords\tsource\toffset\tsize");
++            for (const auto& [hash, shader] : shaders)
++            {
++                f.println("{:016X}\t{:016X}\t{}\t{}\t{}\t{}", hash,
++                    shader.ucodeHash, shader.ucodeDwordCount, shader.sourcePath,
++                    shader.sourceOffset, shader.sourceSize);
++            }
++            writeAllBytes(output, f.out.data(), f.out.size());
++            fmt::println("Indexed {} unique shader containers.", shaders.size());
++            return 0;
++        }
++
++        if (hlslDirectoryMode)
++        {
++            std::filesystem::create_directories(output);
++            std::atomic<uint32_t> progress = 0;
++
++            for (auto& hashShaderPair : shaders)
++            {
++                    auto& [hash, shader] = hashShaderPair;
++                    auto* recompiler = new ShaderRecompiler();
++#ifdef _WIN32
++                    const auto exceptionCode =
++                        recompileShaderSafely(recompiler, shader.data, &include);
++                    if (exceptionCode != ERROR_SUCCESS)
++                    {
++                        fmt::println(stderr, "Skipping shader {:016X}: exception 0x{:08X}", hash, exceptionCode);
++                        continue;
++                    }
++#else
++                    recompiler->recompile(shader.data, include);
++#endif
++
++                    const auto outputPath = std::filesystem::path(output) /
++                        fmt::format("{:016X}.hlsl", hash);
++                    writeAllBytes(outputPath.string().c_str(), recompiler->out.data(), recompiler->out.size());
++                    delete recompiler;
++
++                    const size_t currentProgress = ++progress;
++                    if ((currentProgress % 100) == 0 || currentProgress == shaders.size())
++                        fmt::println("Recompiling shaders to HLSL... {}/{}", currentProgress, shaders.size());
++            }
++
++            return 0;
++        }
++
+         std::atomic<uint32_t> progress = 0;
+ 
+         std::for_each(std::execution::par_unseq, shaders.begin(), shaders.end(), [&](auto& hashShaderPair)

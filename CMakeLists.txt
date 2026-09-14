@@ -42,6 +42,19 @@ else()
     )
 endif()
 
+if(WIN32)
+    add_executable(test_d3d12_shader_linkage
+        tools/test-d3d12-shader-linkage.cpp
+    )
+    target_link_libraries(test_d3d12_shader_linkage PRIVATE d3d12 dxgi d3dcompiler)
+    target_compile_options(test_d3d12_shader_linkage PRIVATE /W4 /WX)
+    add_executable(ac6_xenos_shader_scan
+        tools/ac6_xenos_shader_scan.cpp
+    )
+    target_link_libraries(ac6_xenos_shader_scan PRIVATE bcrypt)
+    target_compile_options(ac6_xenos_shader_scan PRIVATE /W4 /WX)
+endif()
+
 if(XEO3_PRIVATE_SHADER_ARTIFACTS_AVAILABLE)
 set(
     XEO3_DXC_EXECUTABLE
@@ -206,6 +219,11 @@ option(
     "Build and register tests that require generated probe mappings"
     OFF
 )
+option(
+    XEO3_CONTINUOUS_STATE_PUBLICATION
+    "Publish every translated PPC register mutation into XeO3 CPU state"
+    OFF
+)
 
 add_executable(debug_break_after
     tools/debug_break_after.cpp
@@ -295,6 +313,33 @@ if(BUILD_TESTING)
         tests/ac6_queue_wait_tests.cpp
     )
 
+    add_executable(ac6_audio_poll_tests
+        tests/ac6_audio_poll_tests.cpp
+    )
+
+    add_executable(ac6_vd_swap_trace_tests
+        tests/ac6_vd_swap_trace_tests.cpp
+        src/xeo3_bridge/ac6_vd_swap_trace.cpp
+    )
+    target_include_directories(ac6_vd_swap_trace_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_options(ac6_vd_swap_trace_tests PRIVATE /W4 /WX)
+    add_test(NAME ac6_vd_swap_trace_tests COMMAND ac6_vd_swap_trace_tests)
+
+    add_executable(ac6_fast_critical_section_tests
+        tests/ac6_fast_critical_section_tests.cpp
+        src/xeo3_bridge/ac6_fast_critical_section.cpp
+    )
+
+    add_executable(ac6_fast_spin_lock_tests
+        tests/ac6_fast_spin_lock_tests.cpp
+        src/xeo3_bridge/ac6_fast_spin_lock.cpp
+    )
+
+    add_executable(ac6_fast_irql_tests
+        tests/ac6_fast_irql_tests.cpp
+        src/xeo3_bridge/ac6_fast_irql.cpp
+    )
+
     add_executable(xeo3_native_dispatch_tests
         tests/xeo3_native_dispatch_tests.cpp
         tests/xeo3_native_dispatch_test_target.asm
@@ -304,8 +349,26 @@ if(BUILD_TESTING)
     if(XEO3_PRIVATE_SHADER_ARTIFACTS_AVAILABLE)
         add_executable(xeo3_vgpu_patch_tests
             tests/xeo3_vgpu_patch_tests.cpp
+            src/xeo3_bridge/ac6_g2h_trace.cpp
             src/xeo3_bridge/xeo3_vgpu_patch.cpp
             src/xeo3_bridge/xeo3_vgpu_patch_thunk.asm
+        )
+        add_executable(patch_xeo3_shader
+            tools/patch-xeo3-shader.cpp
+            src/xeo3_bridge/ac6_g2h_trace.cpp
+            src/xeo3_bridge/xeo3_vgpu_patch.cpp
+            src/xeo3_bridge/xeo3_vgpu_patch_thunk.asm
+        )
+        target_include_directories(patch_xeo3_shader PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_BINARY_DIR}/generated
+        )
+        add_dependencies(patch_xeo3_shader
+            ac6_edram_scale_shader ac6_edram_load_shader
+            ac6_edram_transfer_vertex_shader ac6_pso341_width_fix_shader
+        )
+        target_compile_options(patch_xeo3_shader PRIVATE
+            $<$<COMPILE_LANGUAGE:CXX>:/W4 /WX /EHsc>
         )
     endif()
 
@@ -343,6 +406,26 @@ if(BUILD_TESTING)
     )
 
     target_include_directories(ac6_queue_wait_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_include_directories(ac6_audio_poll_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_include_directories(ac6_fast_critical_section_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_include_directories(ac6_fast_spin_lock_tests
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_include_directories(ac6_fast_irql_tests
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
@@ -391,6 +474,10 @@ if(BUILD_TESTING)
     target_compile_options(xeo3_mmio_endian_tests PRIVATE /W4 /WX)
     target_compile_options(xeo3_fiber_frame_tests PRIVATE /W4 /WX)
     target_compile_options(ac6_queue_wait_tests PRIVATE /W4 /WX)
+    target_compile_options(ac6_audio_poll_tests PRIVATE /W4 /WX)
+    target_compile_options(ac6_fast_critical_section_tests PRIVATE /W4 /WX)
+    target_compile_options(ac6_fast_spin_lock_tests PRIVATE /W4 /WX)
+    target_compile_options(ac6_fast_irql_tests PRIVATE /W4 /WX)
     target_compile_options(xeo3_native_dispatch_tests
         PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:/W4 /WX>
@@ -418,6 +505,13 @@ if(BUILD_TESTING)
     add_test(NAME xeo3_mmio_endian_tests COMMAND xeo3_mmio_endian_tests)
     add_test(NAME xeo3_fiber_frame_tests COMMAND xeo3_fiber_frame_tests)
     add_test(NAME ac6_queue_wait_tests COMMAND ac6_queue_wait_tests)
+    add_test(NAME ac6_audio_poll_tests COMMAND ac6_audio_poll_tests)
+    add_test(
+        NAME ac6_fast_critical_section_tests
+        COMMAND ac6_fast_critical_section_tests
+    )
+    add_test(NAME ac6_fast_spin_lock_tests COMMAND ac6_fast_spin_lock_tests)
+    add_test(NAME ac6_fast_irql_tests COMMAND ac6_fast_irql_tests)
     add_test(NAME xeo3_native_dispatch_tests COMMAND xeo3_native_dispatch_tests)
     if(XEO3_PRIVATE_SHADER_ARTIFACTS_AVAILABLE)
         add_test(NAME xeo3_vgpu_patch_tests COMMAND xeo3_vgpu_patch_tests)
@@ -457,6 +551,11 @@ if(AC6_RECOMPILED_SOURCES AND EXISTS "${AC6_GENERATED_DIR}/ppc_func_mapping.cpp"
         PRIVATE
             XEO3_RUNTIME_TELEMETRY
     )
+    if(XEO3_CONTINUOUS_STATE_PUBLICATION)
+        target_compile_definitions(ac6_recompiled_code
+            PRIVATE XEO3_CONTINUOUS_STATE_PUBLICATION
+        )
+    endif()
 
     # LLVM 22.1.8's GVN pass reproducibly crashes while optimizing AC6's
     # generated __restvmx_65 helper at /O2. Limit the workaround to whichever
@@ -485,6 +584,11 @@ if(AC6_RECOMPILED_SOURCES AND EXISTS "${AC6_GENERATED_DIR}/ppc_func_mapping.cpp"
         AND XEO3_PRIVATE_SHADER_ARTIFACTS_AVAILABLE
     )
         add_library(xeo3_ac6_aot EXCLUDE_FROM_ALL SHARED
+            src/xeo3_bridge/ac6_vd_swap_trace.cpp
+            src/xeo3_bridge/ac6_g2h_trace.cpp
+            src/xeo3_bridge/ac6_fast_critical_section.cpp
+            src/xeo3_bridge/ac6_fast_irql.cpp
+            src/xeo3_bridge/ac6_fast_spin_lock.cpp
             src/xeo3_bridge/ac6_post_intro_probe.cpp
             src/xeo3_bridge/ac6_synchronous_queue.cpp
             src/xeo3_bridge/ac6_sync_dvd_io.cpp
@@ -523,6 +627,11 @@ if(AC6_RECOMPILED_SOURCES AND EXISTS "${AC6_GENERATED_DIR}/ppc_func_mapping.cpp"
             WIN32_LEAN_AND_MEAN
                 NOMINMAX
         )
+        if(XEO3_CONTINUOUS_STATE_PUBLICATION)
+            target_compile_definitions(xeo3_ac6_aot
+                PRIVATE XEO3_CONTINUOUS_STATE_PUBLICATION
+            )
+        endif()
 
         target_compile_options(xeo3_ac6_aot
             PRIVATE
@@ -585,6 +694,11 @@ if(AC6_RECOMPILED_SOURCES AND EXISTS "${AC6_GENERATED_DIR}/ppc_func_mapping.cpp"
             )
 
             target_compile_options(xeo3_state_sync_tests PRIVATE /W4 /WX)
+            if(XEO3_CONTINUOUS_STATE_PUBLICATION)
+                target_compile_definitions(xeo3_state_sync_tests
+                    PRIVATE XEO3_CONTINUOUS_STATE_PUBLICATION
+                )
+            endif()
             target_include_directories(xeo3_kernel_continuation_tests
                 PRIVATE
                     ${CMAKE_CURRENT_SOURCE_DIR}/src

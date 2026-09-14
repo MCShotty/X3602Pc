@@ -3,7 +3,8 @@ param(
     [string]$XexPath = 'D:\XeO3AC6DVD\default.xex',
     [ValidateSet('Debug', 'Release', 'RelWithDebInfo')]
     [string]$Configuration = 'RelWithDebInfo',
-    [string]$BuildRoot
+    [string]$BuildRoot,
+    [switch]$SkipPdb
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,12 +14,14 @@ $expectedEmuHash =
 $expectedXexHash =
     '6EEFBA42CDFE9121207E534D8D290009C98B1A8C60AE5334A33A4F15167CBBBC'
 $expectedVgpuHash =
-    '17BDCD5866B58DBC50C8BB8C8EC5F9D9BEDFBA81D31DE530760FDE38A8E0EB1D'
+    '8306B4C06B100CAE18F91DCCD0468C2210CCA11A02D928025DE59BD827610247'
 $expectedKernelHash =
     'DA5BE614FB51B5809D70DA073F406F071E5CCB1F8C0EBCD57DAFBAB31B519BDD'
 $expectedKernelAotHash =
     '27CA5876B505361F00C3E1021FF06B68CD666987D4B517C934D69AADF44E8651'
-$expectedPackageVersion = [version]'2607.2223.1.0'
+$expectedInstalledKernelAotHash =
+    '94EA97345F160B9969058422366A72FD182C06B2DA64E72DED98D7E2EEB50637'
+$expectedPackageVersion = [version]'2608.3123.1.0'
 $packageName = 'Xbox360BackwardCompatibil.PrimaryFuzionFrenzyFuzio'
 $dllName = 'xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll'
 $noDllName =
@@ -50,16 +53,21 @@ if ($package.Version -ne $expectedPackageVersion) {
     throw "XeO3 package version mismatch: expected $expectedPackageVersion, found $($package.Version)"
 }
 $installedVgpu = Join-Path $package.InstallLocation 'VGPUDX12.dll'
+$installedKernelAot = Join-Path $package.InstallLocation 'xeo3_5fb3687c_001748c4.dll'
 
-foreach ($requiredPath in @(
+$requiredPaths = @(
     $sourceDll,
-    $sourcePdb,
     $labEmu,
     $labKernel,
     $labKernelAot,
     $XexPath,
-    $installedVgpu
-)) {
+    $installedVgpu,
+    $installedKernelAot
+)
+if (-not $SkipPdb) {
+    $requiredPaths += $sourcePdb
+}
+foreach ($requiredPath in $requiredPaths) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "Required deployment input is missing: $requiredPath"
     }
@@ -91,6 +99,11 @@ $pinnedInputs = @(
         Path = $labKernelAot
         ExpectedHash = $expectedKernelAotHash
     }
+    [pscustomobject]@{
+        Name = 'Installed kernel AOT DLL'
+        Path = $installedKernelAot
+        ExpectedHash = $expectedInstalledKernelAotHash
+    }
 )
 foreach ($input in $pinnedInputs) {
     $actualHash = (
@@ -104,7 +117,11 @@ $actualEmuHash = $pinnedInputs[0].ExpectedHash
 
 $backupRoot = Join-Path $LabRoot 'LocalAotBackups'
 New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
-foreach ($name in @($dllName, $noDllName, $pdbName)) {
+$deployNames = @($dllName, $noDllName)
+if (-not $SkipPdb) {
+    $deployNames += $pdbName
+}
+foreach ($name in $deployNames) {
     $current = Join-Path $LabRoot $name
     if (-not (Test-Path -LiteralPath $current)) {
         continue
@@ -123,7 +140,9 @@ foreach ($name in @($dllName, $noDllName, $pdbName)) {
 
 Copy-Item -LiteralPath $sourceDll -Destination (Join-Path $LabRoot $dllName) -Force
 Copy-Item -LiteralPath $sourceDll -Destination (Join-Path $LabRoot $noDllName) -Force
-Copy-Item -LiteralPath $sourcePdb -Destination (Join-Path $LabRoot $pdbName) -Force
+if (-not $SkipPdb) {
+    Copy-Item -LiteralPath $sourcePdb -Destination (Join-Path $LabRoot $pdbName) -Force
+}
 
 $deployedDll = Join-Path $LabRoot $dllName
 $deployedNoDll = Join-Path $LabRoot $noDllName
@@ -135,10 +154,12 @@ $deployedNoDll = Join-Path $LabRoot $noDllName
     VgpuSha256 = $expectedVgpuHash
     KernelSha256 = $expectedKernelHash
     KernelAotSha256 = $expectedKernelAotHash
+    InstalledKernelAotSha256 = $expectedInstalledKernelAotHash
     Dll = $deployedDll
     DllSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $deployedDll).Hash
     NoDll = $deployedNoDll
     NoDllSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $deployedNoDll).Hash
-    Pdb = Join-Path $LabRoot $pdbName
+    Pdb = if ($SkipPdb) { $sourcePdb } else { Join-Path $LabRoot $pdbName }
+    PdbDeployed = -not $SkipPdb
     BackupRoot = $backupRoot
 } | Format-List

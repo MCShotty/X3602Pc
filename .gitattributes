@@ -1,0 +1,2 @@
+# Preserve portable patch bytes and allow the required blank context prefix.
+*.patch text eol=lf whitespace=-blank-at-eol

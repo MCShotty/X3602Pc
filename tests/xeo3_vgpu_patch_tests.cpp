@@ -2,6 +2,8 @@
 #define NOMINMAX
 
 #include "xeo3_bridge/xeo3_vgpu_patch.h"
+#include "xeo3_bridge/ac6_constant_descriptor_shadow.h"
+#include "xeo3_bridge/ac6_g2h_trace.h"
 
 #include <Windows.h>
 #include <d3d12.h>
@@ -191,6 +193,20 @@ int main() {
               sizeof(encodedAddress));
   CHECK(encodedAddress == targetAddress);
 
+  const auto xenosTranslateJump = xeo3::vgpu::detail::EncodeXenosTranslateJump(
+      reinterpret_cast<const void *>(targetAddress));
+  CHECK(xenosTranslateJump[0] == 0x48);
+  CHECK(xenosTranslateJump[1] == 0xB8);
+  CHECK(xenosTranslateJump[10] == 0xFF);
+  CHECK(xenosTranslateJump[11] == 0xE0);
+  for (std::size_t index = 12; index < xenosTranslateJump.size(); ++index) {
+    CHECK(xenosTranslateJump[index] == 0x90);
+  }
+  encodedAddress = 0;
+  std::memcpy(&encodedAddress, xenosTranslateJump.data() + 2,
+              sizeof(encodedAddress));
+  CHECK(encodedAddress == targetAddress);
+
   const auto textureTransferJump =
       xeo3::vgpu::detail::EncodeTextureTransferJump(
           reinterpret_cast<const void *>(targetAddress));
@@ -222,9 +238,8 @@ int main() {
               sizeof(encodedAddress));
   CHECK(encodedAddress == targetAddress);
 
-  const auto constantUploadJump =
-      xeo3::vgpu::detail::EncodeConstantUploadJump(
-          reinterpret_cast<const void *>(targetAddress));
+  const auto constantUploadJump = xeo3::vgpu::detail::EncodeConstantUploadJump(
+      reinterpret_cast<const void *>(targetAddress));
   CHECK(constantUploadJump[0] == 0x48);
   CHECK(constantUploadJump[1] == 0xB8);
   CHECK(constantUploadJump[10] == 0xFF);
@@ -321,6 +336,20 @@ int main() {
   badShaderCompilePrologue[15] ^= 0xFF;
   CHECK(!xeo3::vgpu::detail::HasExpectedShaderCompilePrologue(
       badShaderCompilePrologue.data(), badShaderCompilePrologue.size()));
+  CHECK(!xeo3::vgpu::detail::HasExpectedShaderCompilePrologue(nullptr, 16));
+
+  constexpr std::array<std::uint8_t, 16> expectedXenosTranslatePrologue{
+      0x48, 0x89, 0x5C, 0x24, 0x20, 0x55, 0x56, 0x57,
+      0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57,
+  };
+  CHECK(xeo3::vgpu::detail::HasExpectedXenosTranslatePrologue(
+      expectedXenosTranslatePrologue.data(),
+      expectedXenosTranslatePrologue.size()));
+  auto badXenosTranslatePrologue = expectedXenosTranslatePrologue;
+  badXenosTranslatePrologue[5] ^= 0xFF;
+  CHECK(!xeo3::vgpu::detail::HasExpectedXenosTranslatePrologue(
+      badXenosTranslatePrologue.data(), badXenosTranslatePrologue.size()));
+  CHECK(!xeo3::vgpu::detail::HasExpectedXenosTranslatePrologue(nullptr, 16));
 
   constexpr std::array<std::uint8_t, 18> expectedTextureTransferPrologue{
       0x40, 0x55, 0x53, 0x56, 0x57, 0x41, 0x54, 0x41, 0x55,
@@ -332,8 +361,7 @@ int main() {
   auto badTextureTransferPrologue = expectedTextureTransferPrologue;
   badTextureTransferPrologue[17] ^= 0xFF;
   CHECK(!xeo3::vgpu::detail::HasExpectedTextureTransferPrologue(
-      badTextureTransferPrologue.data(),
-      badTextureTransferPrologue.size()));
+      badTextureTransferPrologue.data(), badTextureTransferPrologue.size()));
 
   constexpr std::array<std::uint8_t, 16>
       expectedStructuredTextureTransferPrologue{
@@ -362,11 +390,10 @@ int main() {
   CHECK(!xeo3::vgpu::detail::HasExpectedConstantUploadPrologue(
       badConstantUploadPrologue.data(), badConstantUploadPrologue.size()));
 
-  constexpr std::array<std::uint8_t, 18>
-      expectedNullPipelineStateSequence{
-          0x48, 0x89, 0x93, 0x18, 0x10, 0x00, 0x00, 0x8B, 0x03,
-          0x48, 0xC1, 0xE0, 0x05, 0x48, 0x8B, 0x4C, 0x18, 0x08,
-      };
+  constexpr std::array<std::uint8_t, 18> expectedNullPipelineStateSequence{
+      0x48, 0x89, 0x93, 0x18, 0x10, 0x00, 0x00, 0x8B, 0x03,
+      0x48, 0xC1, 0xE0, 0x05, 0x48, 0x8B, 0x4C, 0x18, 0x08,
+  };
   CHECK(xeo3::vgpu::detail::HasExpectedNullPipelineStateSequence(
       expectedNullPipelineStateSequence.data(),
       expectedNullPipelineStateSequence.size()));
@@ -401,16 +428,17 @@ int main() {
   constexpr char reciprocalShaderSource[] =
       "float helper_rcp_value(float x) { return x; }\n"
       "[RootSignature(\"RootFlags(0)\")]\n"
-      "void xenon_vertex_shader() {\n"
-      "  gpr0.x = rcp(gpr1.x);\n"
-      "  gpr0.y = rcp (c(100).w);\n"
-      "}\n";
+       "void xenon_vertex_shader() {\n"
+       "  gpr0.x = rcp(gpr1.x);\n"
+       "  gpr0.y = rcp (c(100).w);\n"
+       "  gpr0.z = rcp( gpr0.w );\n"
+       "}\n";
   std::string reciprocalPatchedShader;
   std::uint32_t reciprocalPatchCount = 0;
   CHECK(xeo3::vgpu::detail::PatchXenosScalarReciprocals(
       reciprocalShaderSource, sizeof(reciprocalShaderSource) - 1,
       reciprocalPatchedShader, reciprocalPatchCount));
-  CHECK(reciprocalPatchCount == 2);
+  CHECK(reciprocalPatchCount == 3);
   CHECK(reciprocalPatchedShader.find(
             "precise float XeO3Ac6ApproximateReciprocal(float operand)") !=
         std::string::npos);
@@ -420,11 +448,12 @@ int main() {
   CHECK(reciprocalPatchedShader.find(
             "gpr0.y = XeO3Ac6ApproximateReciprocal (c(100).w)") !=
         std::string::npos);
-  CHECK(reciprocalPatchedShader.find("helper_rcp_value") !=
-        std::string::npos);
   CHECK(reciprocalPatchedShader.find(
-            "uint bumpedBits = asuint(reciprocal) + 1u") !=
+            "gpr0.z = XeO3Ac6ApproximateReciprocal( gpr0.w )") !=
         std::string::npos);
+  CHECK(reciprocalPatchedShader.find("helper_rcp_value") != std::string::npos);
+  CHECK(reciprocalPatchedShader.find(
+            "uint bumpedBits = asuint(reciprocal) + 1u") != std::string::npos);
   CHECK(reciprocalPatchedShader.find("precise float residual") ==
         std::string::npos);
 
@@ -432,9 +461,8 @@ int main() {
       "[RootSignature(\"RootFlags(0)\")]\n"
       "void xenon_pixel_shader() { gpr0.x = rcp(gpr1.x); }\n";
   CHECK(xeo3::vgpu::detail::PatchXenosScalarReciprocals(
-      reciprocalPixelShaderSource,
-      sizeof(reciprocalPixelShaderSource) - 1, reciprocalPatchedShader,
-      reciprocalPatchCount));
+      reciprocalPixelShaderSource, sizeof(reciprocalPixelShaderSource) - 1,
+      reciprocalPatchedShader, reciprocalPatchCount));
   CHECK(reciprocalPatchCount == 1);
   CHECK(!xeo3::vgpu::detail::PatchXenosScalarReciprocals(
       nullptr, 0, reciprocalPatchedShader, reciprocalPatchCount));
@@ -443,9 +471,151 @@ int main() {
       "void xenon_vertex_shader() { gpr0.x = rcp(gpr1.x); }\n";
   CHECK(!xeo3::vgpu::detail::PatchXenosScalarReciprocals(
       malformedReciprocalShaderSource,
-      sizeof(malformedReciprocalShaderSource) - 1,
-      reciprocalPatchedShader, reciprocalPatchCount));
+      sizeof(malformedReciprocalShaderSource) - 1, reciprocalPatchedShader,
+      reciprocalPatchCount));
   CHECK(reciprocalPatchCount == 0);
+
+  constexpr std::array<std::uint8_t, 32> ac6Pso533PixelShaderDigest{
+      0x06, 0x54, 0x71, 0x85, 0x92, 0x82, 0x2F, 0x3A, 0x66, 0x47, 0x45,
+      0x87, 0x34, 0xDD, 0x46, 0x8B, 0x4F, 0x8C, 0xC0, 0x2B, 0x2A, 0x5D,
+      0x82, 0x63, 0x02, 0xE2, 0x15, 0x0C, 0xC3, 0x09, 0xA1, 0xE4,
+  };
+  CHECK(xeo3::vgpu::detail::MatchesAc6Pso533PixelShaderFingerprint(
+      17879, ac6Pso533PixelShaderDigest));
+  CHECK(!xeo3::vgpu::detail::MatchesAc6Pso533PixelShaderFingerprint(
+      17878, ac6Pso533PixelShaderDigest));
+  auto wrongPso533PixelShaderDigest = ac6Pso533PixelShaderDigest;
+  ++wrongPso533PixelShaderDigest[0];
+  CHECK(!xeo3::vgpu::detail::MatchesAc6Pso533PixelShaderFingerprint(
+      17879, wrongPso533PixelShaderDigest));
+
+  constexpr std::array<std::uint8_t, 32> ac6Pso540VertexShaderDigest{
+      0xBE, 0xE4, 0x1F, 0x9B, 0x23, 0x88, 0xAC, 0x41, 0xE1, 0x9E, 0x97,
+      0x5C, 0xE8, 0xCC, 0xB5, 0x1C, 0xA7, 0x07, 0x27, 0xB2, 0xB5, 0xDB,
+      0xB2, 0x1E, 0x15, 0xD3, 0xA6, 0xA1, 0x10, 0x0B, 0x59, 0x89,
+  };
+  CHECK(xeo3::vgpu::detail::MatchesAc6Pso540VertexShaderFingerprint(
+      7902, ac6Pso540VertexShaderDigest));
+  CHECK(!xeo3::vgpu::detail::MatchesAc6Pso540VertexShaderFingerprint(
+      7901, ac6Pso540VertexShaderDigest));
+  auto wrongPso540VertexShaderDigest = ac6Pso540VertexShaderDigest;
+  ++wrongPso540VertexShaderDigest[31];
+  CHECK(!xeo3::vgpu::detail::MatchesAc6Pso540VertexShaderFingerprint(
+      7902, wrongPso540VertexShaderDigest));
+
+  constexpr char pso533WaveBallotShaderSource[] =
+      "#include \"common_header.h\"\n"
+      "[RootSignature(\"RootFlags(0)\")]\n"
+      "void xenon_pixel_shader() {\n"
+      "  ballot = BallotAny(p,(1));\n"
+      "  ballot = BallotAll(p,(0));\n"
+      "  ballot = BallotAll(p,(1));\n"
+      "}\n";
+  std::string waveBallotPatchedShader;
+  std::uint32_t waveBallotPatchCount = 0;
+  CHECK(xeo3::vgpu::detail::PatchAc6Pso533WaveBallots(
+      pso533WaveBallotShaderSource, sizeof(pso533WaveBallotShaderSource) - 1,
+      waveBallotPatchedShader, waveBallotPatchCount));
+  CHECK(waveBallotPatchCount == 2);
+  CHECK(waveBallotPatchedShader.find(
+            "return WaveActiveAllTrue(predicate == testValue) ? 1u : 0u;") !=
+        std::string::npos);
+  CHECK(waveBallotPatchedShader.find("BallotAny(p,(1))") !=
+        std::string::npos);
+  CHECK(waveBallotPatchedShader.find("XeO3Ac6BallotAll(p,(0))") !=
+        std::string::npos);
+  CHECK(waveBallotPatchedShader.find("XeO3Ac6BallotAll(p,(1))") !=
+        std::string::npos);
+
+  constexpr char pso540WaveBallotShaderSource[] =
+      "#include \"common_header.h\"\n"
+      "[RootSignature(\"RootFlags(0)\")]\n"
+      "void xenon_vertex_shader() {\n"
+      "  ballot = BallotAll(p,(0));\n"
+      "  ballot = BallotAll(p,(1));\n"
+      "}\n";
+  std::string pso540WaveBallotPatchedShader;
+  CHECK(xeo3::vgpu::detail::PatchAc6WaveBallots(
+      pso540WaveBallotShaderSource, sizeof(pso540WaveBallotShaderSource) - 1,
+      pso540WaveBallotPatchedShader, waveBallotPatchCount));
+  CHECK(waveBallotPatchCount == 2);
+  CHECK(pso540WaveBallotPatchedShader.find("void xenon_vertex_shader()") !=
+        std::string::npos);
+  CHECK(pso540WaveBallotPatchedShader.find(
+            "return WaveActiveAllTrue(predicate == testValue) ? 1u : 0u;") !=
+        std::string::npos);
+  CHECK(pso540WaveBallotPatchedShader.find("XeO3Ac6BallotAll(p,(0))") !=
+        std::string::npos);
+  CHECK(pso540WaveBallotPatchedShader.find("XeO3Ac6BallotAll(p,(1))") !=
+        std::string::npos);
+
+  CHECK(xeo3::vgpu::detail::PatchAc6Pso533WaveBallots(
+      waveBallotPatchedShader.data(), waveBallotPatchedShader.size(),
+      reciprocalPatchedShader, waveBallotPatchCount));
+  CHECK(waveBallotPatchCount == 0);
+  CHECK(reciprocalPatchedShader.empty());
+
+  constexpr char malformedWaveBallotShaderSource[] =
+      "[RootSignature(\"RootFlags(0)\")]\n"
+      "void xenon_pixel_shader() { ballot = BallotAll(p,(0)); }\n";
+  CHECK(!xeo3::vgpu::detail::PatchAc6Pso533WaveBallots(
+      malformedWaveBallotShaderSource,
+      sizeof(malformedWaveBallotShaderSource) - 1, waveBallotPatchedShader,
+      waveBallotPatchCount));
+  CHECK(waveBallotPatchCount == 0);
+  CHECK(!xeo3::vgpu::detail::PatchAc6Pso533WaveBallots(
+      nullptr, 0, waveBallotPatchedShader, waveBallotPatchCount));
+
+  xeo3::vgpu::GraphicsPipelineSignature pso535CullSignature{};
+  pso535CullSignature.vertexShaderSha256 = {
+      0xC6, 0xAB, 0x0E, 0x87, 0xB2, 0x08, 0x8B, 0x28, 0x49, 0x8A, 0x4B,
+      0x49, 0x39, 0xFB, 0x02, 0x57, 0x50, 0xC0, 0x3A, 0xDA, 0xB1, 0x93,
+      0xA5, 0xF3, 0xD9, 0xBA, 0x03, 0xED, 0x27, 0xD5, 0x78, 0x1F,
+  };
+  pso535CullSignature.pixelShaderSha256 = {
+      0x4F, 0x41, 0xC8, 0xE3, 0x6C, 0xBC, 0x61, 0x25, 0x07, 0x3A, 0x79,
+      0x04, 0xC6, 0x54, 0x04, 0x26, 0x2E, 0xC6, 0xE7, 0x2F, 0xBB, 0x9F,
+      0x6D, 0xED, 0xE6, 0x5B, 0xC6, 0x48, 0xB3, 0xA5, 0xAC, 0x5D,
+  };
+  pso535CullSignature.vertexShaderSize = 7840;
+  pso535CullSignature.pixelShaderSize = 2780;
+  pso535CullSignature.sampleMask = 15;
+  pso535CullSignature.primitiveTopologyType =
+      D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+  pso535CullSignature.sampleCount = 2;
+  pso535CullSignature.sampleQuality = 0;
+  pso535CullSignature.renderTargetCount = 1;
+  pso535CullSignature.renderTarget0Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  pso535CullSignature.depthStencilFormat =
+      DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+  pso535CullSignature.inputElementCount = 0;
+  pso535CullSignature.renderTarget0WriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+  pso535CullSignature.fillMode = D3D12_FILL_MODE_SOLID;
+  pso535CullSignature.cullMode = D3D12_CULL_MODE_BACK;
+  pso535CullSignature.depthBias = 0;
+  pso535CullSignature.depthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+  pso535CullSignature.depthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+  pso535CullSignature.frontCounterClockwise = true;
+  pso535CullSignature.depthClipEnable = true;
+  pso535CullSignature.multisampleEnable = true;
+  pso535CullSignature.antialiasedLineEnable = false;
+  pso535CullSignature.depthEnable = true;
+  pso535CullSignature.stencilEnable = false;
+  pso535CullSignature.renderTarget0BlendEnable = false;
+  CHECK(xeo3::vgpu::detail::IsAc6Pso535CullPipelineDescriptor(
+      pso535CullSignature));
+  CHECK(xeo3::vgpu::detail::IsAc6Pso535CullPipeline(pso535CullSignature));
+
+  auto mismatchedPso535CullSignature = pso535CullSignature;
+  mismatchedPso535CullSignature.cullMode = D3D12_CULL_MODE_NONE;
+  CHECK(!xeo3::vgpu::detail::IsAc6Pso535CullPipelineDescriptor(
+      mismatchedPso535CullSignature));
+  mismatchedPso535CullSignature = pso535CullSignature;
+  ++mismatchedPso535CullSignature.vertexShaderSha256[0];
+  CHECK(xeo3::vgpu::detail::IsAc6Pso535CullPipelineDescriptor(
+      mismatchedPso535CullSignature));
+  CHECK(!xeo3::vgpu::detail::IsAc6Pso535CullPipeline(
+      mismatchedPso535CullSignature));
 
   constexpr char vposPixelShaderSource[] =
       "#include \"common_header.h\"\n"
@@ -464,9 +634,9 @@ int main() {
       vposPixelShaderSource, sizeof(vposPixelShaderSource) - 1,
       patchedVposShader, vposPatchCount));
   CHECK(vposPatchCount == 1);
-  CHECK(patchedVposShader.find(
-            "gpr0.xy = gpr0.xy * (float2(1.0f, 1.0f)).xy;") !=
-        std::string::npos);
+  CHECK(
+      patchedVposShader.find("gpr0.xy = gpr0.xy * (float2(1.0f, 1.0f)).xy;") !=
+      std::string::npos);
   CHECK(patchedVposShader.find("vpos_Scale") == std::string::npos);
   CHECK(patchedVposShader.find("vport_Scale") == std::string::npos);
 
@@ -486,17 +656,14 @@ int main() {
       "  OutV.oD = gpr1.x;\n"
       "}\n";
   CHECK(xeo3::vgpu::detail::PatchAc6ScreenSpaceVposScale(
-      ac6SceneVposPixelShaderSource,
-      sizeof(ac6SceneVposPixelShaderSource) - 1, patchedVposShader,
-      vposPatchCount));
+      ac6SceneVposPixelShaderSource, sizeof(ac6SceneVposPixelShaderSource) - 1,
+      patchedVposShader, vposPatchCount));
   CHECK(vposPatchCount == 1);
-  CHECK(patchedVposShader.find(
-            "gpr0.xy = gpr0.xy * (float2(1.0f, 1.0f)).xy;") !=
-        std::string::npos);
-  CHECK(patchedVposShader.find("gpr1.x = gpr1.x * 0.5f;") ==
-        std::string::npos);
-  CHECK(patchedVposShader.find(
-            "gpr0.xy = gpr0.xy * float2(0.5f, 1.0f);") ==
+  CHECK(
+      patchedVposShader.find("gpr0.xy = gpr0.xy * (float2(1.0f, 1.0f)).xy;") !=
+      std::string::npos);
+  CHECK(patchedVposShader.find("gpr1.x = gpr1.x * 0.5f;") == std::string::npos);
+  CHECK(patchedVposShader.find("gpr0.xy = gpr0.xy * float2(0.5f, 1.0f);") ==
         std::string::npos);
 
   constexpr char malformedAc6SceneVposPixelShaderSource[] =
@@ -515,11 +682,10 @@ int main() {
       "}\n";
   CHECK(xeo3::vgpu::detail::PatchAc6ScreenSpaceVposScale(
       malformedAc6SceneVposPixelShaderSource,
-      sizeof(malformedAc6SceneVposPixelShaderSource) - 1,
-      patchedVposShader, vposPatchCount));
+      sizeof(malformedAc6SceneVposPixelShaderSource) - 1, patchedVposShader,
+      vposPatchCount));
   CHECK(vposPatchCount == 1);
-  CHECK(patchedVposShader.find("gpr1.x = gpr1.x * 0.5f;") ==
-        std::string::npos);
+  CHECK(patchedVposShader.find("gpr1.x = gpr1.x * 0.5f;") == std::string::npos);
 
   constexpr char duplicateAc6SceneVposPixelShaderSource[] =
       "#include \"common_header.h\"\n"
@@ -539,11 +705,10 @@ int main() {
       "}\n";
   CHECK(xeo3::vgpu::detail::PatchAc6ScreenSpaceVposScale(
       duplicateAc6SceneVposPixelShaderSource,
-      sizeof(duplicateAc6SceneVposPixelShaderSource) - 1,
-      patchedVposShader, vposPatchCount));
+      sizeof(duplicateAc6SceneVposPixelShaderSource) - 1, patchedVposShader,
+      vposPatchCount));
   CHECK(vposPatchCount == 1);
-  CHECK(patchedVposShader.find("gpr1.x = gpr1.x * 0.5f;") ==
-        std::string::npos);
+  CHECK(patchedVposShader.find("gpr1.x = gpr1.x * 0.5f;") == std::string::npos);
 
   constexpr char particleVposPixelShaderSource[] =
       "#include \"common_header.h\"\n"
@@ -552,16 +717,15 @@ int main() {
       "  gpr1.xy = gpr1.xy * vpos_Scale.xy;\n"
       "}\n";
   CHECK(xeo3::vgpu::detail::PatchAc6ScreenSpaceVposScale(
-      particleVposPixelShaderSource,
-      sizeof(particleVposPixelShaderSource) - 1, patchedVposShader,
-      vposPatchCount));
+      particleVposPixelShaderSource, sizeof(particleVposPixelShaderSource) - 1,
+      patchedVposShader, vposPatchCount));
   CHECK(vposPatchCount == 2);
   CHECK(patchedVposShader.find(
             "gpr1.zw = InV.v3.xy / (float2(1.0f, 1.0f)).xy;") !=
         std::string::npos);
-  CHECK(patchedVposShader.find(
-            "gpr1.xy = gpr1.xy * (float2(1.0f, 1.0f)).xy;") !=
-        std::string::npos);
+  CHECK(
+      patchedVposShader.find("gpr1.xy = gpr1.xy * (float2(1.0f, 1.0f)).xy;") !=
+      std::string::npos);
 
   constexpr char pointSpriteVposGeometryShaderSource[] =
       "#include \"common_header.h\"\n"
@@ -574,8 +738,7 @@ int main() {
       sizeof(pointSpriteVposGeometryShaderSource) - 1, patchedVposShader,
       vposPatchCount));
   CHECK(vposPatchCount == 2);
-  CHECK(patchedVposShader.find(
-            "float1 pSZ = oPsz / (float2(1.0f, 1.0f)).x;") !=
+  CHECK(patchedVposShader.find("float1 pSZ = oPsz / (float2(1.0f, 1.0f)).x;") !=
         std::string::npos);
   CHECK(patchedVposShader.find(
             "gsoutput.v3 = texcoords * (float2(1.0f, 1.0f)).xy;") !=
@@ -606,10 +769,9 @@ int main() {
       nullptr, 0, patchedVposShader, vposPatchCount));
 
   constexpr std::array<std::uint8_t, 32> ac6Pso537ShaderDigest{
-      0x10, 0x0A, 0x6B, 0xAA, 0xAC, 0x33, 0x57, 0x53,
-      0x0C, 0x7B, 0x69, 0x94, 0xE1, 0xFF, 0xD5, 0x83,
-      0x79, 0xB0, 0x77, 0xCD, 0x66, 0xE5, 0x9D, 0xAD,
-      0xF6, 0xD2, 0x06, 0x3F, 0xC9, 0x35, 0x11, 0xF9,
+      0x10, 0x0A, 0x6B, 0xAA, 0xAC, 0x33, 0x57, 0x53, 0x0C, 0x7B, 0x69,
+      0x94, 0xE1, 0xFF, 0xD5, 0x83, 0x79, 0xB0, 0x77, 0xCD, 0x66, 0xE5,
+      0x9D, 0xAD, 0xF6, 0xD2, 0x06, 0x3F, 0xC9, 0x35, 0x11, 0xF9,
   };
   CHECK(xeo3::vgpu::detail::MatchesAc6Pso537ShaderFingerprint(
       3351, ac6Pso537ShaderDigest));
@@ -620,27 +782,25 @@ int main() {
   CHECK(!xeo3::vgpu::detail::MatchesAc6Pso537ShaderFingerprint(
       3351, wrongPso537ShaderDigest));
 
-  constexpr char ac6Pso537ShaderSource[] =
-      "struct OutputType {\n"
-      "  float4 oC0 : SV_Target0;\n"
-      "  float1 oD : SV_Depth;\n"
-      "};\n"
-      "Texture2D texOBJ1 : register(t1);\n"
-      "Texture2D texOBJ2 : register(t2);\n"
-      "void xenon_pixel_shader() {\n"
-      "  gpr1.xy = gpr0.xy * c(255).xy;\n"
-      "  tT.xy = gpr1.xy;\n"
-      "}\n";
+  constexpr char ac6Pso537ShaderSource[] = "struct OutputType {\n"
+                                           "  float4 oC0 : SV_Target0;\n"
+                                           "  float1 oD : SV_Depth;\n"
+                                           "};\n"
+                                           "Texture2D texOBJ1 : register(t1);\n"
+                                           "Texture2D texOBJ2 : register(t2);\n"
+                                           "void xenon_pixel_shader() {\n"
+                                           "  gpr1.xy = gpr0.xy * c(255).xy;\n"
+                                           "  tT.xy = gpr1.xy;\n"
+                                           "}\n";
   std::string patchedPso537Shader;
   std::uint32_t pso537PatchCount = 0;
   CHECK(xeo3::vgpu::detail::PatchAc6Pso537HalfWidthUv(
       ac6Pso537ShaderSource, sizeof(ac6Pso537ShaderSource) - 1,
       patchedPso537Shader, pso537PatchCount));
   CHECK(pso537PatchCount == 1);
-  CHECK(patchedPso537Shader.find(
-            "gpr1.xy = gpr0.xy * c(255).xy;\n"
-            "gpr1.x = gpr1.x * 0.5f;\n"
-            "  tT.xy = gpr1.xy;") != std::string::npos);
+  CHECK(patchedPso537Shader.find("gpr1.xy = gpr0.xy * c(255).xy;\n"
+                                 "gpr1.x = gpr1.x * 0.5f;\n"
+                                 "  tT.xy = gpr1.xy;") != std::string::npos);
   CHECK(!xeo3::vgpu::detail::PatchAc6Pso537HalfWidthUv(
       nullptr, 0, patchedPso537Shader, pso537PatchCount));
 
@@ -663,9 +823,8 @@ int main() {
       ac6ToneMapShaderSource, sizeof(ac6ToneMapShaderSource) - 1,
       patchedToneMapShader, toneMapPatchCount));
   CHECK(toneMapPatchCount == 1);
-  CHECK(patchedToneMapShader.find(
-            "OutV.oC0.xyz = mad( gpr1.xyz, "
-            "float3(1.0f, 1.0f, 1.0f), gpr0.xyw );") !=
+  CHECK(patchedToneMapShader.find("OutV.oC0.xyz = mad( gpr1.xyz, "
+                                  "float3(1.0f, 1.0f, 1.0f), gpr0.xyw );") !=
         std::string::npos);
   CHECK(patchedToneMapShader.find(
             "OutV.oC0.xyz = mad( gpr1.xyz, gpr0.zzz, gpr0.xyw );") ==
@@ -676,9 +835,8 @@ int main() {
       "  OutV.oC0.xyz = mad( gpr1.xyz, gpr0.zzz, gpr0.xyw );\n"
       "}\n";
   CHECK(xeo3::vgpu::detail::PatchAc6ToneMapInterpolant(
-      unrelatedToneMapShaderSource,
-      sizeof(unrelatedToneMapShaderSource) - 1, patchedToneMapShader,
-      toneMapPatchCount));
+      unrelatedToneMapShaderSource, sizeof(unrelatedToneMapShaderSource) - 1,
+      patchedToneMapShader, toneMapPatchCount));
   CHECK(toneMapPatchCount == 0);
   CHECK(patchedToneMapShader.empty());
   CHECK(!xeo3::vgpu::detail::PatchAc6ToneMapInterpolant(
@@ -698,6 +856,152 @@ int main() {
   CHECK(!xeo3::vgpu::detail::MatchesAc6ExposureShaderFingerprint(
       3317, wrongExposureShaderDigest));
 
+  constexpr std::array<std::uint8_t, 32> ac6SkyRestartShaderDigest{
+      0xEB, 0x95, 0x4D, 0xCD, 0x9B, 0xDB, 0x98, 0xBC, 0xCE, 0xDC, 0x6E,
+      0xCC, 0xF8, 0x53, 0xD3, 0xB8, 0x4F, 0xA2, 0x7A, 0x13, 0xDA, 0x93,
+      0xBE, 0x12, 0xEE, 0x6C, 0x1A, 0xFA, 0x41, 0xD1, 0x70, 0xE9,
+  };
+  CHECK(xeo3::vgpu::detail::MatchesAc6SkyRestartShaderFingerprint(
+      2581, ac6SkyRestartShaderDigest));
+  CHECK(!xeo3::vgpu::detail::MatchesAc6SkyRestartShaderFingerprint(
+      2580, ac6SkyRestartShaderDigest));
+  auto wrongSkyRestartShaderDigest = ac6SkyRestartShaderDigest;
+  ++wrongSkyRestartShaderDigest[0];
+  CHECK(!xeo3::vgpu::detail::MatchesAc6SkyRestartShaderFingerprint(
+      2581, wrongSkyRestartShaderDigest));
+
+  constexpr std::array<std::uint8_t, 32> ac6TerrainFanRestartShaderDigest{
+      0xBB, 0x1C, 0xBA, 0x01, 0x5B, 0x7F, 0x47, 0xA0, 0x78, 0x05, 0xE5,
+      0xB7, 0xD8, 0x36, 0x7A, 0xCF, 0x84, 0xDA, 0xC5, 0xDA, 0x1C, 0xDC,
+      0xED, 0x80, 0xAF, 0xB4, 0xCE, 0x32, 0xAB, 0x22, 0xF0, 0x5F,
+  };
+  CHECK(xeo3::vgpu::detail::MatchesAc6TerrainFanRestartShaderFingerprint(
+      5398, ac6TerrainFanRestartShaderDigest));
+  CHECK(!xeo3::vgpu::detail::MatchesAc6TerrainFanRestartShaderFingerprint(
+      5397, ac6TerrainFanRestartShaderDigest));
+  auto wrongTerrainFanRestartShaderDigest = ac6TerrainFanRestartShaderDigest;
+  ++wrongTerrainFanRestartShaderDigest[31];
+  CHECK(!xeo3::vgpu::detail::MatchesAc6TerrainFanRestartShaderFingerprint(
+      5398, wrongTerrainFanRestartShaderDigest));
+
+  constexpr std::array<std::uint8_t, 32> ac6TerrainFanRestartDxilDigest{
+      0x50, 0x9E, 0xC0, 0xF2, 0x86, 0xCD, 0xD9, 0x9B, 0x35, 0x50, 0x26,
+      0x0B, 0x5F, 0x2F, 0x0D, 0xD1, 0x6B, 0x38, 0x02, 0x95, 0xC1, 0x81,
+      0x5B, 0x93, 0xBD, 0x5B, 0xEF, 0x0D, 0x99, 0x54, 0x63, 0xA7,
+  };
+  constexpr std::array<std::uint8_t, 32> ac6AircraftRestartShaderDigest{
+      0x50, 0x68, 0x0B, 0x1F, 0xA8, 0x45, 0x87, 0x9F, 0xD6, 0x8E, 0xB3,
+      0x9A, 0x34, 0xB8, 0x48, 0x20, 0x36, 0x62, 0x5E, 0x13, 0xB8, 0xD3,
+      0x06, 0xBA, 0xBF, 0x94, 0xCD, 0xC4, 0x2D, 0x8E, 0x2A, 0x4A,
+  };
+  CHECK(xeo3::vgpu::detail::MatchesAc6AircraftRestartShaderFingerprint(
+      4807, ac6AircraftRestartShaderDigest));
+  CHECK(!xeo3::vgpu::detail::MatchesAc6AircraftRestartShaderFingerprint(
+      4806, ac6AircraftRestartShaderDigest));
+  auto wrongAircraftRestartShaderDigest = ac6AircraftRestartShaderDigest;
+  ++wrongAircraftRestartShaderDigest[31];
+  CHECK(!xeo3::vgpu::detail::MatchesAc6AircraftRestartShaderFingerprint(
+      4807, wrongAircraftRestartShaderDigest));
+  constexpr std::array<std::uint8_t, 32> ac6ShadowRestartShaderDigest{
+      0x6C, 0x0E, 0xDF, 0x6C, 0xA9, 0x47, 0xE4, 0x7A, 0x84, 0x9C, 0x87,
+      0xFB, 0xD6, 0x4C, 0x52, 0xC1, 0x94, 0xCB, 0x13, 0x4D, 0x7D, 0x2B,
+      0xDB, 0xEF, 0x02, 0xA7, 0x90, 0x4F, 0xAD, 0x56, 0xFE, 0x42,
+  };
+  CHECK(xeo3::vgpu::detail::MatchesAc6ShadowRestartShaderFingerprint(
+      4299, ac6ShadowRestartShaderDigest));
+  CHECK(!xeo3::vgpu::detail::MatchesAc6ShadowRestartShaderFingerprint(
+      4298, ac6ShadowRestartShaderDigest));
+  auto wrongShadowRestartShaderDigest = ac6ShadowRestartShaderDigest;
+  ++wrongShadowRestartShaderDigest[0];
+  CHECK(!xeo3::vgpu::detail::MatchesAc6ShadowRestartShaderFingerprint(
+      4299, wrongShadowRestartShaderDigest));
+  constexpr std::array<std::uint8_t, 32> ac6SkyRestartDxilDigest{
+      0x82, 0xDC, 0x76, 0xA8, 0xE1, 0x24, 0xE9, 0x85, 0x8B, 0xF3, 0x47,
+      0xFC, 0x7B, 0x26, 0x7D, 0xC1, 0x69, 0xC1, 0x66, 0x7F, 0xC9, 0x4F,
+      0xB6, 0xDB, 0x23, 0xEF, 0x32, 0xB7, 0xE9, 0x87, 0x01, 0x04,
+  };
+  xeo3::vgpu::GraphicsPipelineSignature restartPipelineSignature{};
+  restartPipelineSignature.vertexShaderSize = 11008;
+  restartPipelineSignature.vertexShaderSha256 = ac6TerrainFanRestartDxilDigest;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::TerrainFan);
+  constexpr std::array<std::uint8_t, 32> ac6TerrainFanRestartWindowDxilDigest{
+      0xA6, 0xD4, 0x21, 0xB7, 0xF2, 0xFF, 0xEC, 0x26, 0x09, 0x7D, 0x50,
+      0x70, 0x4A, 0x58, 0x0F, 0x9A, 0x10, 0x5B, 0x80, 0xC8, 0x20, 0xD5,
+      0x1D, 0x26, 0x37, 0xD3, 0x18, 0xE3, 0xC8, 0x06, 0x3C, 0xC5,
+  };
+  restartPipelineSignature.vertexShaderSize = 11192;
+  restartPipelineSignature.vertexShaderSha256 =
+      ac6TerrainFanRestartWindowDxilDigest;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::TerrainFan);
+  restartPipelineSignature.vertexShaderSize = 11191;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::None);
+  restartPipelineSignature.vertexShaderSize = 11192;
+  ++restartPipelineSignature.vertexShaderSha256[0];
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::None);
+  restartPipelineSignature.vertexShaderSize = 7680;
+  restartPipelineSignature.vertexShaderSha256 = ac6SkyRestartDxilDigest;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::SkyStrip);
+  restartPipelineSignature.vertexShaderSize = 7840;
+  restartPipelineSignature.vertexShaderSha256 =
+      pso535CullSignature.vertexShaderSha256;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::SkyStrip);
+  restartPipelineSignature.vertexShaderSize = 7679;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::None);
+  restartPipelineSignature.vertexShaderSize = 7680;
+  ++restartPipelineSignature.vertexShaderSha256[31];
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::None);
+
+  constexpr std::array<std::uint8_t, 32> terrainDrawLocalDigest{
+      0x03, 0xCA, 0x9A, 0x3A, 0x68, 0xDF, 0xC8, 0xBD, 0x67, 0x72, 0x24, 0x9F, 0x99, 0xEB, 0x7C, 0xEE, 0x7F, 0xA4, 0x99, 0xEE, 0x68, 0x4C, 0x81, 0xD5, 0xE3, 0xFD, 0x00, 0xD9, 0xB2, 0x06, 0x04, 0xB8,
+  };
+  constexpr std::array<std::uint8_t, 32> skyDrawLocalDigest{
+      0x5F, 0x40, 0xFD, 0x64, 0x6C, 0x18, 0x10, 0x8A, 0x34, 0x13, 0x94, 0xCD, 0x5A, 0x55, 0x59, 0xDB, 0x2E, 0xB7, 0x53, 0xB9, 0xCF, 0x86, 0xD4, 0x15, 0xAA, 0x00, 0xA2, 0xE5, 0x80, 0xC4, 0xF2, 0xBC,
+  };
+  restartPipelineSignature.vertexShaderSize = 11156;
+  restartPipelineSignature.vertexShaderSha256 = terrainDrawLocalDigest;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::TerrainFan);
+  --restartPipelineSignature.vertexShaderSize;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::None);
+  restartPipelineSignature.vertexShaderSize = 11156;
+  ++restartPipelineSignature.vertexShaderSha256[0];
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::None);
+  restartPipelineSignature.vertexShaderSize = 7800;
+  restartPipelineSignature.vertexShaderSha256 = skyDrawLocalDigest;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::SkyStrip);
+  ++restartPipelineSignature.vertexShaderSize;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::None);
+  restartPipelineSignature.vertexShaderSize = 7800;
+  ++restartPipelineSignature.vertexShaderSha256[31];
+  CHECK(xeo3::vgpu::detail::ClassifyAc6PrimitiveRestartPipeline(
+            restartPipelineSignature) ==
+        xeo3::vgpu::Ac6PrimitiveRestartPipeline::None);
+
   constexpr char ac6ExposureShaderSource[] =
       "Texture2D texOBJ19 : register(t19);\n"
       "void xenon_vertex_shader() {\n"
@@ -715,17 +1019,15 @@ int main() {
   CHECK(exposurePatchCount == 1);
   CHECK(patchedExposureShader.find(
             "gpr0.x = (isfinite(gpr0.x) && gpr0.x > 0.0f && "
-            "gpr0.x <= 65536.0f) ? gpr0.x : c(106).y;") !=
-        std::string::npos);
+            "gpr0.x <= 65536.0f) ? gpr0.x : c(106).y;") != std::string::npos);
 
   constexpr char unrelatedExposureShaderSource[] =
       "void xenon_vertex_shader() {\n"
       "gpr0.x = tmp0.x;\n"
       "}\n";
   CHECK(xeo3::vgpu::detail::PatchAc6ExposureSample(
-      unrelatedExposureShaderSource,
-      sizeof(unrelatedExposureShaderSource) - 1, patchedExposureShader,
-      exposurePatchCount));
+      unrelatedExposureShaderSource, sizeof(unrelatedExposureShaderSource) - 1,
+      patchedExposureShader, exposurePatchCount));
   CHECK(exposurePatchCount == 0);
   CHECK(patchedExposureShader.empty());
   CHECK(!xeo3::vgpu::detail::PatchAc6ExposureSample(
@@ -734,40 +1036,86 @@ int main() {
   constexpr std::array<std::uint32_t, 6> textureUnpackSignature{
       0, 2, 4, 1, 6, 14400,
   };
-  CHECK(xeo3::vgpu::detail::IsAc6TextureUnpackTransfer(
-      textureUnpackSignature));
+  CHECK(xeo3::vgpu::detail::IsAc6TextureUnpackTransfer(textureUnpackSignature));
+  CHECK(xeo3::vgpu::detail::ClassifyAc6TextureUnpackTransfer(
+            textureUnpackSignature) == xeo3::vgpu::Ac6TextureUnpackKind::Frame);
   auto textureUnpackConstants = textureUnpackSignature;
-  CHECK(xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(
-      textureUnpackConstants, 0));
+  CHECK(xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(textureUnpackConstants,
+                                                        0));
   CHECK(textureUnpackConstants ==
         (std::array<std::uint32_t, 6>{0, 0, 4, 1, 6, 14400}));
   for (const auto replacement : {1U, 3U}) {
     auto alternateConstants = textureUnpackSignature;
-    CHECK(xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(
-        alternateConstants, replacement));
+    CHECK(xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(alternateConstants,
+                                                          replacement));
     CHECK(alternateConstants[1] == replacement);
   }
   for (const auto replacement : {2U, 4U}) {
     auto invalidReplacement = textureUnpackSignature;
-    CHECK(!xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(
-        invalidReplacement, replacement));
+    CHECK(!xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(invalidReplacement,
+                                                           replacement));
     CHECK(invalidReplacement == textureUnpackSignature);
   }
   std::array<std::uint32_t, 12> structuredTextureDescriptor{
-      0, 2, 4, 1, 0xAAAAAAAA, 0xBBBBBBBB,
+      0, 2,     4,          1,          0xAAAAAAAA, 0xBBBBBBBB,
       6, 14400, 0xCCCCCCCC, 0xDDDDDDDD, 0xEEEEEEEE, 0xFFFFFFFF,
   };
   CHECK(xeo3::vgpu::detail::ExtractStructuredTextureTransferConstants(
             structuredTextureDescriptor.data()) == textureUnpackSignature);
   CHECK(xeo3::vgpu::detail::ExtractStructuredTextureTransferConstants(
             nullptr) == (std::array<std::uint32_t, 6>{}));
-  for (std::size_t index = 0; index < textureUnpackSignature.size(); ++index) {
-    auto nearMiss = textureUnpackSignature;
-    ++nearMiss[index];
-    const auto original = nearMiss;
-    CHECK(!xeo3::vgpu::detail::IsAc6TextureUnpackTransfer(nearMiss));
-    CHECK(!xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(nearMiss, 0));
-    CHECK(nearMiss == original);
+  constexpr std::array<std::uint32_t, 6> targetPreviewUnpackSignature{
+      0, 2, 4, 1, 6, 468,
+  };
+  CHECK(xeo3::vgpu::detail::ClassifyAc6TextureUnpackTransfer(
+            targetPreviewUnpackSignature) ==
+        xeo3::vgpu::Ac6TextureUnpackKind::TargetPreview);
+  CHECK(xeo3::vgpu::detail::IsAc6TextureUnpackTransfer(
+      targetPreviewUnpackSignature));
+  for (const auto replacement : {0U, 1U, 3U}) {
+    auto previewConstants = targetPreviewUnpackSignature;
+    CHECK(xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(previewConstants,
+                                                         replacement));
+    auto expected = targetPreviewUnpackSignature;
+    expected[1] = replacement;
+    CHECK(previewConstants == expected);
+    CHECK(!xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(previewConstants,
+                                                          replacement));
+    CHECK(previewConstants == expected);
+  }
+  for (const auto replacement : {2U, 4U, UINT32_MAX}) {
+    auto previewConstants = targetPreviewUnpackSignature;
+    CHECK(!xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(previewConstants,
+                                                          replacement));
+    CHECK(previewConstants == targetPreviewUnpackSignature);
+  }
+  structuredTextureDescriptor[7] = 468;
+  CHECK(xeo3::vgpu::detail::ExtractStructuredTextureTransferConstants(
+            structuredTextureDescriptor.data()) == targetPreviewUnpackSignature);
+  for (const auto &signature : {textureUnpackSignature,
+                                targetPreviewUnpackSignature}) {
+    for (std::size_t index = 0; index < signature.size(); ++index) {
+      auto nearMiss = signature;
+      ++nearMiss[index];
+      const auto original = nearMiss;
+      CHECK(xeo3::vgpu::detail::ClassifyAc6TextureUnpackTransfer(nearMiss) ==
+            xeo3::vgpu::Ac6TextureUnpackKind::None);
+      CHECK(!xeo3::vgpu::detail::IsAc6TextureUnpackTransfer(nearMiss));
+      CHECK(!xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(nearMiss, 0));
+      CHECK(nearMiss == original);
+    }
+  }
+  // Observed mip chains, downscaled targets and unconfirmed preview sizes
+  // must not acquire the correction simply because they share a format.
+  for (const auto count : {0U, 225U, 467U, 469U, 504U, 900U, 1024U, 1280U,
+                           1344U, 1360U, 1364U, 1800U, 3600U, UINT32_MAX}) {
+    auto unrelated = textureUnpackSignature;
+    unrelated[5] = count;
+    const auto original = unrelated;
+    CHECK(xeo3::vgpu::detail::ClassifyAc6TextureUnpackTransfer(unrelated) ==
+          xeo3::vgpu::Ac6TextureUnpackKind::None);
+    CHECK(!xeo3::vgpu::detail::PatchAc6TextureUnpackEndian(unrelated, 0));
+    CHECK(unrelated == original);
   }
 
   std::array<std::uint32_t,
@@ -805,6 +1153,22 @@ int main() {
   CHECK(!xeo3::vgpu::detail::ResolveAc6Pso341UploadOffset(
       0x2577C0000ULL, 0x300, 0x3FF, 0xDF0000, 0x2578DFE00ULL,
       xeo3::vgpu::kAc6Pso341TaskBufferSize, uploadOffset));
+  CHECK(xeo3::vgpu::detail::IsConstantUploadContextGeometryValid(
+      0x100000000ULL, 0x100, 0x1000, 0x100000, 0x80));
+  CHECK(xeo3::vgpu::detail::IsConstantUploadContextGeometryValid(
+      0x100000000ULL, 0x80, 1, 0x80, 0x80));
+  CHECK(!xeo3::vgpu::detail::IsConstantUploadContextGeometryValid(
+      0, 0x100, 0x1000, 0x100000, 0x80));
+  CHECK(!xeo3::vgpu::detail::IsConstantUploadContextGeometryValid(
+      0x100000000ULL, 0, 0x1000, 0x100000, 0x80));
+  CHECK(!xeo3::vgpu::detail::IsConstantUploadContextGeometryValid(
+      0x100000000ULL, 0x100, 0, 0x100000, 0x80));
+  CHECK(!xeo3::vgpu::detail::IsConstantUploadContextGeometryValid(
+      0x100000000ULL, 0x100, 0x1000, 0x0FFFFF, 0x80));
+  CHECK(!xeo3::vgpu::detail::IsConstantUploadContextGeometryValid(
+      0x100000000ULL, 0x100, 0x1000, 0x100000, 0x101));
+  CHECK(!xeo3::vgpu::detail::IsConstantUploadContextGeometryValid(
+      0x100000000ULL, 0x100, 0x1000, 0x100000, 0));
   const std::array<std::uint64_t, 4> liveAmdCbvDescriptor{
       0x00100002578D0E00ULL, 0x11014FAC00000010ULL, 0, 0};
   CHECK(xeo3::vgpu::detail::DecodeAmdConstantBufferGpuAddress(
@@ -815,35 +1179,29 @@ int main() {
             unalignedAmdCbvDescriptor) == 0);
   CHECK(xeo3::vgpu::detail::DecodeAmdConstantBufferGpuAddress({}) == 0);
   constexpr std::array<std::uint8_t, 32> pso341ComputeShaderSha256{
-      0xB1, 0x5D, 0x25, 0xCB, 0x2A, 0x20, 0x52, 0xA5,
-      0x2D, 0xCB, 0x65, 0x68, 0x9B, 0x1E, 0xD5, 0x4D,
-      0x2A, 0xA3, 0x8E, 0x84, 0xF4, 0x0E, 0x75, 0x36,
-      0x84, 0x56, 0x1C, 0x10, 0x39, 0xED, 0x4A, 0x54,
+      0xB1, 0x5D, 0x25, 0xCB, 0x2A, 0x20, 0x52, 0xA5, 0x2D, 0xCB, 0x65,
+      0x68, 0x9B, 0x1E, 0xD5, 0x4D, 0x2A, 0xA3, 0x8E, 0x84, 0xF4, 0x0E,
+      0x75, 0x36, 0x84, 0x56, 0x1C, 0x10, 0x39, 0xED, 0x4A, 0x54,
   };
   CHECK(xeo3::vgpu::detail::MatchesAc6Pso341ComputeShaderFingerprint(
-      xeo3::vgpu::kAc6Pso341ComputeShaderSize,
-      pso341ComputeShaderSha256));
+      xeo3::vgpu::kAc6Pso341ComputeShaderSize, pso341ComputeShaderSha256));
   CHECK(!xeo3::vgpu::detail::MatchesAc6Pso341ComputeShaderFingerprint(
-      xeo3::vgpu::kAc6Pso341ComputeShaderSize - 1,
-      pso341ComputeShaderSha256));
+      xeo3::vgpu::kAc6Pso341ComputeShaderSize - 1, pso341ComputeShaderSha256));
   auto pso341ComputeShaderNearMiss = pso341ComputeShaderSha256;
   pso341ComputeShaderNearMiss[31] ^= 1;
   CHECK(!xeo3::vgpu::detail::MatchesAc6Pso341ComputeShaderFingerprint(
-      xeo3::vgpu::kAc6Pso341ComputeShaderSize,
-      pso341ComputeShaderNearMiss));
+      xeo3::vgpu::kAc6Pso341ComputeShaderSize, pso341ComputeShaderNearMiss));
   constexpr std::array<std::uint8_t, 32> pso341CachedBlobSha256{
-      0x75, 0xC7, 0xF4, 0x4B, 0x78, 0x4A, 0x9F, 0x7A,
-      0x2D, 0xE0, 0x21, 0x6A, 0x0F, 0x46, 0x0E, 0xF0,
-      0x40, 0x7F, 0x4F, 0x5E, 0x83, 0x5F, 0x6F, 0x86,
-      0x04, 0xF1, 0xB7, 0x0B, 0xF0, 0xC0, 0x50, 0xCA,
+      0x75, 0xC7, 0xF4, 0x4B, 0x78, 0x4A, 0x9F, 0x7A, 0x2D, 0xE0, 0x21,
+      0x6A, 0x0F, 0x46, 0x0E, 0xF0, 0x40, 0x7F, 0x4F, 0x5E, 0x83, 0x5F,
+      0x6F, 0x86, 0x04, 0xF1, 0xB7, 0x0B, 0xF0, 0xC0, 0x50, 0xCA,
   };
   CHECK(xeo3::vgpu::detail::MatchesAc6Pso341CachedPipelineBlob(
       954, pso341CachedBlobSha256));
   constexpr std::array<std::uint8_t, 32> pso341LiveCachedBlobSha256{
-      0x2D, 0x34, 0x18, 0x7A, 0x02, 0x0B, 0x37, 0xA6,
-      0x9B, 0x0B, 0x07, 0x7B, 0xFC, 0x08, 0x00, 0x5A,
-      0xD0, 0xA7, 0xA5, 0x30, 0x33, 0x7D, 0xBA, 0xF4,
-      0xCF, 0x9C, 0x0E, 0x6B, 0xE7, 0xB3, 0x6A, 0xE4,
+      0x2D, 0x34, 0x18, 0x7A, 0x02, 0x0B, 0x37, 0xA6, 0x9B, 0x0B, 0x07,
+      0x7B, 0xFC, 0x08, 0x00, 0x5A, 0xD0, 0xA7, 0xA5, 0x30, 0x33, 0x7D,
+      0xBA, 0xF4, 0xCF, 0x9C, 0x0E, 0x6B, 0xE7, 0xB3, 0x6A, 0xE4,
   };
   CHECK(xeo3::vgpu::detail::MatchesAc6Pso341CachedPipelineBlob(
       954, pso341LiveCachedBlobSha256));
@@ -855,8 +1213,7 @@ int main() {
       954, pso341CachedBlobNearMiss));
   transfer341TaskBuffer[0] = 1280;
   transfer341TaskBuffer[1] = 720;
-  transfer341TaskBuffer[2] =
-      xeo3::vgpu::kAc6Pso341BrokenPackedDimensions;
+  transfer341TaskBuffer[2] = xeo3::vgpu::kAc6Pso341BrokenPackedDimensions;
   transfer341TaskBuffer[3] = 1;
   transfer341TaskBuffer[4] = 5120;
   transfer341TaskBuffer[128] = 14400;
@@ -891,30 +1248,28 @@ int main() {
   CHECK(replacementPackedDimensions == 0);
 
   auto brokenTransfer341TaskBuffer = transfer341TaskBuffer;
-  brokenTransfer341TaskBuffer[2] =
-      xeo3::vgpu::kAc6Pso341BrokenPackedDimensions;
+  brokenTransfer341TaskBuffer[2] = xeo3::vgpu::kAc6Pso341BrokenPackedDimensions;
   constexpr std::array<std::size_t, 8> transfer341GuardedFields{
       0, 1, 3, 4, 5, 6, 7, 128,
   };
   for (const auto index : transfer341GuardedFields) {
     auto nearMiss = brokenTransfer341TaskBuffer;
     ++nearMiss[index];
-    CHECK(xeo3::vgpu::detail::ClassifyAc6Pso341TaskWidth(
-              nearMiss.data(), sizeof(nearMiss)) ==
+    CHECK(xeo3::vgpu::detail::ClassifyAc6Pso341TaskWidth(nearMiss.data(),
+                                                         sizeof(nearMiss)) ==
           xeo3::vgpu::Ac6Pso341TaskWidthState::NotCandidate);
   }
   for (std::size_t index = 129; index < 144; ++index) {
     auto nearMiss = brokenTransfer341TaskBuffer;
     nearMiss[index] = 0;
-    CHECK(xeo3::vgpu::detail::ClassifyAc6Pso341TaskWidth(
-              nearMiss.data(), sizeof(nearMiss)) ==
+    CHECK(xeo3::vgpu::detail::ClassifyAc6Pso341TaskWidth(nearMiss.data(),
+                                                         sizeof(nearMiss)) ==
           xeo3::vgpu::Ac6Pso341TaskWidthState::NotCandidate);
   }
   auto invalidPackedDimensions = brokenTransfer341TaskBuffer;
   invalidPackedDimensions[2] = 0x02D004FF;
   CHECK(xeo3::vgpu::detail::ClassifyAc6Pso341TaskWidth(
-            invalidPackedDimensions.data(),
-            sizeof(invalidPackedDimensions)) ==
+            invalidPackedDimensions.data(), sizeof(invalidPackedDimensions)) ==
         xeo3::vgpu::Ac6Pso341TaskWidthState::NotCandidate);
   CHECK(xeo3::vgpu::detail::ClassifyAc6Pso341TaskWidth(
             brokenTransfer341TaskBuffer.data(),
@@ -925,19 +1280,15 @@ int main() {
         xeo3::vgpu::Ac6Pso341TaskWidthState::NotCandidate);
 
   constexpr std::array<std::uint32_t, 16> edramLoadConstants{
-      0, 0, 1280, 720, 0, 0, 1280, 720,
-      1280, 2048, 1280, 720, 1, 0, 0, 16,
+      0, 0, 1280, 720, 0, 0, 1280, 720, 1280, 2048, 1280, 720, 1, 0, 0, 16,
   };
   constexpr std::array<std::uint32_t, 16> edramScaleConstants{
-      0, 0, 1280, 720, 0, 0, 640, 360,
-      1280, 2048, 640, 360, 1, 0, 0, 16,
+      0, 0, 1280, 720, 0, 0, 640, 360, 1280, 2048, 640, 360, 1, 0, 0, 16,
   };
   CHECK(xeo3::vgpu::detail::ClassifyAc6EdramTransferConstants(
-            edramLoadConstants) ==
-        xeo3::vgpu::Ac6EdramConstantKind::Load);
+            edramLoadConstants) == xeo3::vgpu::Ac6EdramConstantKind::Load);
   CHECK(xeo3::vgpu::detail::ClassifyAc6EdramTransferConstants(
-            edramScaleConstants) ==
-        xeo3::vgpu::Ac6EdramConstantKind::Scale);
+            edramScaleConstants) == xeo3::vgpu::Ac6EdramConstantKind::Scale);
 
   auto edramCandidateConstants = edramScaleConstants;
   edramCandidateConstants[6] = 960;
@@ -950,19 +1301,45 @@ int main() {
   auto edramNearMissConstants = edramCandidateConstants;
   edramNearMissConstants[12] = 0;
   CHECK(xeo3::vgpu::detail::ClassifyAc6EdramTransferConstants(
-            edramNearMissConstants) ==
-        xeo3::vgpu::Ac6EdramConstantKind::None);
+            edramNearMissConstants) == xeo3::vgpu::Ac6EdramConstantKind::None);
 
   const auto packedEdramConstants =
-      xeo3::vgpu::detail::PackAc6EdramTransferConstants(
-          edramScaleConstants);
+      xeo3::vgpu::detail::PackAc6EdramTransferConstants(edramScaleConstants);
   for (std::size_t index = 0; index < packedEdramConstants.size(); ++index) {
     const auto expected =
         static_cast<std::uint64_t>(edramScaleConstants[index * 2]) |
-        (static_cast<std::uint64_t>(edramScaleConstants[index * 2 + 1])
-         << 32);
+        (static_cast<std::uint64_t>(edramScaleConstants[index * 2 + 1]) << 32);
     CHECK(packedEdramConstants[index] == expected);
   }
+
+  constexpr std::array<std::array<std::uint32_t, 4>, 6>
+      nativeEdramScaleAddresses{{
+          {0, 160, 2, 162},
+          {1, 161, 3, 163},
+          {80, 240, 82, 242},
+          {1280, 1440, 1282, 1442},
+          {21760, 21920, 21762, 21922},
+          {921437, 921597, 921439, 921599},
+      }};
+  constexpr std::array<std::array<std::uint32_t, 2>, 6> coordinates{{
+      {0, 0},
+      {1, 0},
+      {0, 1},
+      {40, 0},
+      {40, 8},
+      {639, 359},
+  }};
+  for (std::size_t coordinateIndex = 0; coordinateIndex < coordinates.size();
+       ++coordinateIndex) {
+    for (std::uint32_t sample = 0; sample < 4; ++sample) {
+      CHECK(xeo3::vgpu::detail::ComputeAc6EdramScaleAddress(
+                coordinates[coordinateIndex][0],
+                coordinates[coordinateIndex][1], 1, 0, sample,
+                16) == nativeEdramScaleAddresses[coordinateIndex][sample]);
+    }
+  }
+  CHECK(xeo3::vgpu::detail::ComputeAc6EdramScaleAddress(1, 0, 2, 7, 0, 16) ==
+        7u * 1280u + 2621440u);
 
   constexpr char groundShaderSource[] =
       "OutputType xenon_vertex_shader(InputType InV) {\n"
@@ -981,6 +1358,34 @@ int main() {
         std::string::npos);
   CHECK(patchedGroundShader.find("vtxOBJ36, (gpr12.w + 0.00025f), 20") !=
         std::string::npos);
+
+  // The dominant Mission 01 terrain shader (Xenia 65791AE90218DFB6,
+  // XeO3 compile 284) contains six non-rounded vfetch instructions. Keep this
+  // exact signature covered while reciprocal correction remains opt-in: PIX
+  // A/B runs showed it did not change the corrupt terrain output.
+  constexpr char mission01TerrainVertexShader[] =
+      "OutputType xenon_vertex_shader(InputType InV) {\n"
+      "gpr1 = FetchByID_FLOAT4(vtxOBJ35, gpr0.y, 4, 0, 0).wxyz;\n"
+      "gpr2 = FetchByID_FLOAT4(vtxOBJ35, gpr1.y, 4, 0, 0);\n"
+      "gpr1 = FetchByID_FLOAT4(vtxOBJ35, gpr1.x, 4, 0, 0);\n"
+      "gpr1.xyz = FetchByID_FLOAT4(vtxOBJ36, gpr0.y, 4, 0, 0).xzy;\n"
+      "gpr11.zw = FetchByID_FLOAT4(vtxOBJ37, gpr0.y, 4, 0, 0).xy;\n"
+      "gpr4 = FetchByID_FLOAT4(vtxOBJ38, gpr3.w, 4, 0, 0).zxyw;\n"
+      "}\n";
+  CHECK(xeo3::vgpu::detail::PatchAc6GroundFetchIndices(
+      mission01TerrainVertexShader, sizeof(mission01TerrainVertexShader) - 1,
+      patchedGroundShader, groundFetchPatchCount));
+  CHECK(groundFetchPatchCount == 6);
+  for (const auto expected : {
+           "vtxOBJ35, (gpr0.y + 0.00025f)",
+           "vtxOBJ35, (gpr1.y + 0.00025f)",
+           "vtxOBJ35, (gpr1.x + 0.00025f)",
+           "vtxOBJ36, (gpr0.y + 0.00025f)",
+           "vtxOBJ37, (gpr0.y + 0.00025f)",
+           "vtxOBJ38, (gpr3.w + 0.00025f)",
+       }) {
+    CHECK(patchedGroundShader.find(expected) != std::string::npos);
+  }
 
   constexpr char alreadyPatchedShaderSource[] =
       "void xenon_vertex_shader() {\n"
@@ -1016,17 +1421,26 @@ int main() {
       indexedVertexShaderSource, sizeof(indexedVertexShaderSource) - 1,
       patchedIndexShader, indexPatchCount));
   CHECK(indexPatchCount == 1);
-  CHECK(patchedIndexShader.find(
-            "float XeO3IndexClip : SV_ClipDistance0;") != std::string::npos);
-  CHECK(patchedIndexShader.find(
-            "XeO3GuestIndexRaw & 0x00FFFFFFu") != std::string::npos);
-  CHECK(patchedIndexShader.find("IbDescUseResetIdx(PackedIbDesc)") ==
+  CHECK(patchedIndexShader.find("XeO3BaseVertex") ==
         std::string::npos);
   CHECK(patchedIndexShader.find(
-            "XeO3GuestIndex24 == 0x00FFFFFFu") != std::string::npos);
+            "const uint XeO3LocalHostIndex = InV.vID;") !=
+        std::string::npos);
   CHECK(patchedIndexShader.find(
-            "VID = int(XeO3GuestIndexCut ? 0u : "
-            "XeO3GuestIndexMasked);") != std::string::npos);
+            "VID = VID + vertexOffset;") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find(
+            "HostToGuestIndex(XeO3LocalHostIndex)") != std::string::npos);
+  CHECK(patchedIndexShader.find("float XeO3IndexClip : SV_ClipDistance0;") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find("XeO3GuestIndexRaw & 0x00FFFFFFu") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find("IbDescUseResetIdx(PackedIbDesc)") ==
+        std::string::npos);
+  CHECK(patchedIndexShader.find("XeO3GuestIndex24 == 0x00FFFFFFu") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find("VID = int(XeO3GuestIndexCut ? 0u : "
+                                "XeO3GuestIndexMasked);") != std::string::npos);
   CHECK(patchedIndexShader.find(
             "OutV.XeO3IndexClip = XeO3GuestIndexCut ? -1.0f : 0.0f;") !=
         std::string::npos);
@@ -1057,11 +1471,154 @@ int main() {
       sizeof(genericIndexedVertexShaderSource) - 1, patchedIndexShader,
       indexPatchCount));
   CHECK(indexPatchCount == 1);
+  CHECK(patchedIndexShader.find("XeO3BaseVertex") ==
+        std::string::npos);
+  CHECK(patchedIndexShader.find("const uint XeO3LocalHostIndex = InV.vID;") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find(
+            "HostToGuestIndex(XeO3LocalHostIndex)") != std::string::npos);
   CHECK(patchedIndexShader.find("XeO3GuestIndexUses24Bits") !=
         std::string::npos);
   CHECK(patchedIndexShader.find(
             "OutV.XeO3IndexClip = XeO3GuestIndexCut ? -1.0f : 0.0f;") !=
         std::string::npos);
+
+  constexpr char pointSpriteVertexShaderSource[] =
+      "struct OutputType {\n"
+      "    float4 o0 : TEXCOORD0;\n"
+      "    float4 oP : SV_Position;\n"
+      "    float2 oPsz : PSIZE;\n"
+      "};\n"
+      "OutputType xenon_vertex_shader(InputType InV) {\n"
+      "OutputType OutV;\n"
+      "VID = HostToGuestIndex(InV.vID);\n"
+      "return OutV;\n"
+      "}\n";
+  CHECK(xeo3::vgpu::detail::PatchXenosIndexBufferSemantics(
+      pointSpriteVertexShaderSource, sizeof(pointSpriteVertexShaderSource) - 1,
+      patchedIndexShader, indexPatchCount));
+  CHECK(indexPatchCount == 1);
+  CHECK(patchedIndexShader.find("float2 oPsz : PSIZE;") <
+        patchedIndexShader.find("float XeO3IndexClip : SV_ClipDistance0;"));
+  CHECK(patchedIndexShader.find("float XeO3IndexClip : SV_ClipDistance0;") <
+        patchedIndexShader.find("};"));
+  CHECK(patchedIndexShader.find("float4 o0 : TEXCOORD0;\n"
+                                 "    float4 oP : SV_Position;\n"
+                                 "    float2 oPsz : PSIZE;") != std::string::npos);
+
+  constexpr char restartedStripVertexShaderSource[] =
+      "Buffer<float1> vtxOBJ35: register(t35);\n"
+      "struct OutputType {\n"
+      "    float4 oP : SV_Position;\n"
+      "};\n"
+      "[RootSignature(\"RootFlags(0)\")]\n"
+      "OutputType xenon_vertex_shader(InputType InV) {\n"
+      "OutputType OutV;\n"
+      "int VID = 0;\n"
+      "VID = HostToGuestIndex(InV.vID);\n"
+      "VID = VID + vertexOffset;\n"
+      "gpr0.xy = FetchByID_FLOAT2(vtxOBJ35, VID, 2, 0, 0).xy;\n"
+      "OutV.oP = float4(gpr0.xy, 0, 1);\n"
+      "return OutV;\n"
+      "}\n";
+  CHECK(xeo3::vgpu::detail::PatchXenosIndexBufferSemantics(
+      restartedStripVertexShaderSource,
+      sizeof(restartedStripVertexShaderSource) - 1, patchedIndexShader,
+      indexPatchCount, true));
+  CHECK(indexPatchCount == 1);
+  CHECK(patchedIndexShader.find("uint2 XeO3ResolveGuestIndex") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find("XeO3RestartScanSteps < 64u") !=
+        std::string::npos);
+  std::string extendedRestartShader;
+  std::uint32_t extendedRestartPatchCount = 0;
+  CHECK(xeo3::vgpu::detail::PatchXenosIndexBufferSemantics(
+      restartedStripVertexShaderSource,
+      sizeof(restartedStripVertexShaderSource) - 1, extendedRestartShader,
+      extendedRestartPatchCount, true, 128));
+  CHECK(extendedRestartPatchCount == 1);
+  CHECK(extendedRestartShader.find("XeO3RestartScanSteps < 128u") !=
+        std::string::npos);
+  CHECK(extendedRestartShader.find("XeO3RestartScanSteps < 64u") ==
+        std::string::npos);
+  CHECK(!xeo3::vgpu::detail::PatchXenosIndexBufferSemantics(
+      restartedStripVertexShaderSource,
+      sizeof(restartedStripVertexShaderSource) - 1, extendedRestartShader,
+      extendedRestartPatchCount, true, 0));
+  CHECK(extendedRestartShader.empty() && extendedRestartPatchCount == 0);
+  CHECK(!xeo3::vgpu::detail::PatchXenosIndexBufferSemantics(
+      restartedStripVertexShaderSource,
+      sizeof(restartedStripVertexShaderSource) - 1, extendedRestartShader,
+      extendedRestartPatchCount, true, 257));
+  CHECK(patchedIndexShader.find(
+            "XeO3PrimitiveType != 5u && XeO3PrimitiveType != 6u") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find("XeO3RestartScanSteps < 64u") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find("XeO3BaseVertex") ==
+        std::string::npos);
+  CHECK(patchedIndexShader.find(
+            "const uint XeO3LocalHostIndex = hostIndex;") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find(
+            "VID = VID + vertexOffset;") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find(
+            "HostToGuestIndex(XeO3LocalHostIndex)") != std::string::npos);
+  CHECK(patchedIndexShader.find(
+            "XeO3PrimitiveIndex = XeO3LocalHostIndex / 3u") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find(
+            "XeO3VertexInPrimitive = XeO3LocalHostIndex % 3u") !=
+        std::string::npos);
+  CHECK(
+      patchedIndexShader.find("(XeO3PrimitiveIndex - XeO3SegmentStart) & 1u") !=
+      std::string::npos);
+  CHECK(patchedIndexShader.find("XeO3IndexPosition0 = XeO3SegmentStart;") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find(
+            "((XeO3WindowStartIndex & XeO3ResetMask) == "
+            "XeO3ComparableReset)") != std::string::npos);
+  CHECK(patchedIndexShader.find("XeO3GuestIndexResetTriangle") !=
+        std::string::npos);
+  CHECK(patchedIndexShader.find(
+            "OutV.XeO3IndexClip = XeO3GuestIndexRejected ? -1.0f : "
+            "0.0f;") != std::string::npos);
+  const auto restartHelperPosition =
+      patchedIndexShader.find("uint2 XeO3ResolveGuestIndex");
+  const auto rootSignaturePosition = patchedIndexShader.find("[RootSignature(");
+  CHECK(restartHelperPosition < rootSignaturePosition);
+
+  // A 10-index fan followed by a reset creates three invalid windows in
+  // XeO3's naive triangle-list expansion. The third starts on the reset but
+  // doesn't otherwise fetch it, which is the boundary case this guard fixes.
+  constexpr std::array<std::uint32_t, 21> restartedFanIndices{
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,   0xFFFF,
+      100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+  };
+  const auto fanWindowRejected = [&restartedFanIndices](
+                                     const std::uint32_t primitiveIndex) {
+    std::uint32_t segmentStart = 0;
+    for (auto cursor = primitiveIndex; cursor > 0; --cursor) {
+      if (restartedFanIndices[cursor - 1] == 0xFFFF) {
+        segmentStart = cursor;
+        break;
+      }
+    }
+    return restartedFanIndices[primitiveIndex] == 0xFFFF ||
+           restartedFanIndices[segmentStart] == 0xFFFF ||
+           restartedFanIndices[primitiveIndex + 1] == 0xFFFF ||
+           restartedFanIndices[primitiveIndex + 2] == 0xFFFF;
+  };
+  CHECK(fanWindowRejected(8));
+  CHECK(fanWindowRejected(9));
+  CHECK(fanWindowRejected(10));
+  CHECK(!fanWindowRejected(11));
+  CHECK(xeo3::vgpu::detail::PatchXenosIndexBufferSemantics(
+      patchedIndexShader.data(), patchedIndexShader.size(), patchedGroundShader,
+      indexPatchCount, true));
+  CHECK(indexPatchCount == 0);
+  CHECK(patchedGroundShader.empty());
 
   constexpr char nonIndexedVertexShaderSource[] =
       "struct OutputType { float4 oP : SV_Position; };\n"
@@ -1093,7 +1650,7 @@ int main() {
   CHECK(indexPatchCount == 0);
 
   constexpr std::array<std::uint8_t, 6> expectedTightAlignmentGate{
-      0x0F, 0x85, 0xCA, 0x2D, 0x04, 0x00,
+      0x0F, 0x85, 0xB4, 0x4A, 0x04, 0x00,
   };
   CHECK(xeo3::vgpu::detail::HasExpectedTightAlignmentGate(
       expectedTightAlignmentGate.data(), expectedTightAlignmentGate.size()));
@@ -1101,9 +1658,14 @@ int main() {
   badTightAlignmentGate[5] ^= 0xFF;
   CHECK(!xeo3::vgpu::detail::HasExpectedTightAlignmentGate(
       badTightAlignmentGate.data(), badTightAlignmentGate.size()));
+  constexpr std::array<std::uint8_t, 6> previousTightAlignmentGate{
+      0x0F, 0x85, 0xCA, 0x2D, 0x04, 0x00,
+  };
+  CHECK(!xeo3::vgpu::detail::HasExpectedTightAlignmentGate(
+      previousTightAlignmentGate.data(), previousTightAlignmentGate.size()));
 
   constexpr std::array<std::uint8_t, 6> expectedPlacedResourceGate{
-      0x0F, 0x84, 0x9C, 0x2D, 0x04, 0x00,
+      0x0F, 0x84, 0x86, 0x4A, 0x04, 0x00,
   };
   CHECK(xeo3::vgpu::detail::HasExpectedPlacedResourceGate(
       expectedPlacedResourceGate.data(), expectedPlacedResourceGate.size()));
@@ -1111,6 +1673,11 @@ int main() {
   badPlacedResourceGate[1] ^= 0xFF;
   CHECK(!xeo3::vgpu::detail::HasExpectedPlacedResourceGate(
       badPlacedResourceGate.data(), badPlacedResourceGate.size()));
+  constexpr std::array<std::uint8_t, 6> previousPlacedResourceGate{
+      0x0F, 0x84, 0x9C, 0x2D, 0x04, 0x00,
+  };
+  CHECK(!xeo3::vgpu::detail::HasExpectedPlacedResourceGate(
+      previousPlacedResourceGate.data(), previousPlacedResourceGate.size()));
 
   constexpr std::uint32_t dxgiErrorInvalidCall = 0x887A0001;
   constexpr std::uint32_t bufferDimension = 1;
@@ -1179,28 +1746,27 @@ int main() {
             allowShaderAtomics) == (createNotZeroed | allowShaderAtomics));
 
   constexpr std::array<std::uint8_t, 32> abcSha256{
-      0xBA, 0x78, 0x16, 0xBF, 0x8F, 0x01, 0xCF, 0xEA,
-      0x41, 0x41, 0x40, 0xDE, 0x5D, 0xAE, 0x22, 0x23,
-      0xB0, 0x03, 0x61, 0xA3, 0x96, 0x17, 0x7A, 0x9C,
-      0xB4, 0x10, 0xFF, 0x61, 0xF2, 0x00, 0x15, 0xAD,
+      0xBA, 0x78, 0x16, 0xBF, 0x8F, 0x01, 0xCF, 0xEA, 0x41, 0x41, 0x40,
+      0xDE, 0x5D, 0xAE, 0x22, 0x23, 0xB0, 0x03, 0x61, 0xA3, 0x96, 0x17,
+      0x7A, 0x9C, 0xB4, 0x10, 0xFF, 0x61, 0xF2, 0x00, 0x15, 0xAD,
   };
   std::array<std::uint8_t, 32> computedSha256{};
   constexpr char sha256Input[] = "abc";
   CHECK(xeo3::vgpu::detail::HashBytesSha256(
       sha256Input, sizeof(sha256Input) - 1, computedSha256));
   CHECK(computedSha256 == abcSha256);
-  CHECK(!xeo3::vgpu::detail::HashBytesSha256(
-      nullptr, 1, computedSha256));
+  CHECK(!xeo3::vgpu::detail::HashBytesSha256(nullptr, 1, computedSha256));
 
-  using TestVertexShaderSubobject = TestPipelineStateStreamSubobject<
-      D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, D3D12_SHADER_BYTECODE>;
-  using TestPixelShaderSubobject = TestPipelineStateStreamSubobject<
-      D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, D3D12_SHADER_BYTECODE>;
+  using TestVertexShaderSubobject =
+      TestPipelineStateStreamSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS,
+                                       D3D12_SHADER_BYTECODE>;
+  using TestPixelShaderSubobject =
+      TestPipelineStateStreamSubobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS,
+                                       D3D12_SHADER_BYTECODE>;
   using TestBlendSubobject = TestPipelineStateStreamSubobject<
       D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_BLEND, D3D12_BLEND_DESC>;
   using TestRasterizerSubobject = TestPipelineStateStreamSubobject<
-      D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER,
-      D3D12_RASTERIZER_DESC>;
+      D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_RASTERIZER, D3D12_RASTERIZER_DESC>;
   using TestDepthStencilSubobject = TestPipelineStateStreamSubobject<
       D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL,
       D3D12_DEPTH_STENCIL_DESC>;
@@ -1226,18 +1792,16 @@ int main() {
   std::array<std::uint8_t, 2224> streamVertexShader{};
   std::array<std::uint8_t, 2440> streamPixelShader{};
   std::array<D3D12_INPUT_ELEMENT_DESC, 2> streamInputElements{
-      D3D12_INPUT_ELEMENT_DESC{
-          "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0,
-          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      D3D12_INPUT_ELEMENT_DESC{
-          "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8,
-          D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+      D3D12_INPUT_ELEMENT_DESC{"POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0,
+                               D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
+      D3D12_INPUT_ELEMENT_DESC{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8,
+                               D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
   };
   TestPipelineStream pipelineStream{};
-  pipelineStream.vertexShader.value = {
-      streamVertexShader.data(), streamVertexShader.size()};
-  pipelineStream.pixelShader.value = {
-      streamPixelShader.data(), streamPixelShader.size()};
+  pipelineStream.vertexShader.value = {streamVertexShader.data(),
+                                       streamVertexShader.size()};
+  pipelineStream.pixelShader.value = {streamPixelShader.data(),
+                                      streamPixelShader.size()};
   auto &streamRenderTarget = pipelineStream.blend.value.RenderTarget[0];
   streamRenderTarget.SrcBlend = D3D12_BLEND_ONE;
   streamRenderTarget.DestBlend = D3D12_BLEND_ZERO;
@@ -1274,8 +1838,7 @@ int main() {
   CHECK(streamSignature.sampleCount == 1);
   CHECK(streamSignature.hasExpectedInputLayout);
   CHECK(streamSignature.hasExpectedEdramLoadFixedState);
-  CHECK(xeo3::vgpu::detail::IsAc6EdramLoadPipelineDescriptor(
-      streamSignature));
+  CHECK(xeo3::vgpu::detail::IsAc6EdramLoadPipelineDescriptor(streamSignature));
   CHECK(!xeo3::vgpu::detail::IsAc6EdramLoadPipeline(streamSignature));
   CHECK(!xeo3::vgpu::detail::ExtractGraphicsPipelineStreamSignature(
       &pipelineStream, sizeof(pipelineStream) - 1, streamSignature,
@@ -1283,16 +1846,14 @@ int main() {
 
   xeo3::vgpu::GraphicsPipelineSignature restoreSignature{};
   restoreSignature.vertexShaderSha256 = {
-      0x7F, 0x3F, 0x8E, 0x0E, 0xEC, 0x40, 0x28, 0xEC,
-      0xCF, 0xBF, 0x2E, 0x63, 0x62, 0x1B, 0x28, 0x04,
-      0x95, 0x28, 0xEC, 0xFA, 0xE2, 0xEC, 0xEC, 0x50,
-      0x45, 0xB5, 0xD6, 0x5E, 0x72, 0xCB, 0xA8, 0x1E,
+      0x7F, 0x3F, 0x8E, 0x0E, 0xEC, 0x40, 0x28, 0xEC, 0xCF, 0xBF, 0x2E,
+      0x63, 0x62, 0x1B, 0x28, 0x04, 0x95, 0x28, 0xEC, 0xFA, 0xE2, 0xEC,
+      0xEC, 0x50, 0x45, 0xB5, 0xD6, 0x5E, 0x72, 0xCB, 0xA8, 0x1E,
   };
   restoreSignature.pixelShaderSha256 = {
-      0x3A, 0x20, 0x6A, 0x6D, 0xC3, 0xF9, 0xAE, 0xEE,
-      0x03, 0x8F, 0xEE, 0xFD, 0x23, 0x57, 0x67, 0xCD,
-      0x40, 0xF9, 0x92, 0xE1, 0x7B, 0xE9, 0x4B, 0xA2,
-      0x0B, 0xA8, 0x8F, 0x90, 0x4A, 0x2F, 0x23, 0x81,
+      0x3A, 0x20, 0x6A, 0x6D, 0xC3, 0xF9, 0xAE, 0xEE, 0x03, 0x8F, 0xEE,
+      0xFD, 0x23, 0x57, 0x67, 0xCD, 0x40, 0xF9, 0x92, 0xE1, 0x7B, 0xE9,
+      0x4B, 0xA2, 0x0B, 0xA8, 0x8F, 0x90, 0x4A, 0x2F, 0x23, 0x81,
   };
   restoreSignature.vertexShaderSize = 2224;
   restoreSignature.pixelShaderSize = 2440;
@@ -1307,8 +1868,7 @@ int main() {
   restoreSignature.renderTarget0WriteMask = 15;
   restoreSignature.hasExpectedInputLayout = true;
   restoreSignature.hasExpectedFixedState = true;
-  CHECK(xeo3::vgpu::detail::IsAc6CorruptEdramRestorePipeline(
-      restoreSignature));
+  CHECK(xeo3::vgpu::detail::IsAc6CorruptEdramRestorePipeline(restoreSignature));
 
   auto mismatchedRestoreSignature = restoreSignature;
   mismatchedRestoreSignature.pixelShaderSha256[0] ^= 0xFF;
@@ -1329,15 +1889,13 @@ int main() {
 
   std::size_t edramScaleShaderSize = 0;
   const auto *const edramScaleShader =
-      xeo3::vgpu::detail::GetAc6EdramScaleFixPixelShader(
-          edramScaleShaderSize);
+      xeo3::vgpu::detail::GetAc6EdramScaleFixPixelShader(edramScaleShaderSize);
   CHECK(edramScaleShader != nullptr);
-  CHECK(edramScaleShaderSize == 4456);
+  CHECK(edramScaleShaderSize == 4460);
   constexpr std::array<std::uint8_t, 32> edramScaleShaderSha256{
-      0x7B, 0x95, 0xD5, 0xED, 0x49, 0x02, 0x17, 0xAA,
-      0xAB, 0xE0, 0xFC, 0x50, 0xD9, 0xF2, 0x20, 0x5A,
-      0x97, 0xB5, 0xB1, 0x5D, 0x0C, 0x93, 0xD6, 0xD6,
-      0x8E, 0x73, 0x8B, 0xCD, 0xBE, 0x38, 0x6D, 0x3A,
+      0x3D, 0xC7, 0x3F, 0x6B, 0xCA, 0x67, 0x3C, 0xF1, 0x9D, 0xCD, 0x9C,
+      0x8B, 0x19, 0x4F, 0x1B, 0xB4, 0x9F, 0xCF, 0x6B, 0x7F, 0x2B, 0xA6,
+      0x75, 0x71, 0x9C, 0xD8, 0x4B, 0x63, 0x77, 0x6F, 0x6C, 0xC0,
   };
   CHECK(xeo3::vgpu::detail::HashBytesSha256(
       edramScaleShader, edramScaleShaderSize, computedSha256));
@@ -1345,16 +1903,14 @@ int main() {
 
   xeo3::vgpu::GraphicsPipelineSignature edramScaleSignature{};
   edramScaleSignature.vertexShaderSha256 = {
-      0x7F, 0x3F, 0x8E, 0x0E, 0xEC, 0x40, 0x28, 0xEC,
-      0xCF, 0xBF, 0x2E, 0x63, 0x62, 0x1B, 0x28, 0x04,
-      0x95, 0x28, 0xEC, 0xFA, 0xE2, 0xEC, 0xEC, 0x50,
-      0x45, 0xB5, 0xD6, 0x5E, 0x72, 0xCB, 0xA8, 0x1E,
+      0x7F, 0x3F, 0x8E, 0x0E, 0xEC, 0x40, 0x28, 0xEC, 0xCF, 0xBF, 0x2E,
+      0x63, 0x62, 0x1B, 0x28, 0x04, 0x95, 0x28, 0xEC, 0xFA, 0xE2, 0xEC,
+      0xEC, 0x50, 0x45, 0xB5, 0xD6, 0x5E, 0x72, 0xCB, 0xA8, 0x1E,
   };
   edramScaleSignature.pixelShaderSha256 = {
-      0x1E, 0x88, 0x74, 0xA8, 0xEE, 0x00, 0x5E, 0x72,
-      0x4F, 0xB5, 0xC4, 0x55, 0xE2, 0xF0, 0x35, 0x07,
-      0xB4, 0x16, 0x59, 0xE6, 0x12, 0x46, 0x78, 0xE9,
-      0x41, 0x2C, 0x87, 0x30, 0x5B, 0x49, 0x62, 0x51,
+      0x1E, 0x88, 0x74, 0xA8, 0xEE, 0x00, 0x5E, 0x72, 0x4F, 0xB5, 0xC4,
+      0x55, 0xE2, 0xF0, 0x35, 0x07, 0xB4, 0x16, 0x59, 0xE6, 0x12, 0x46,
+      0x78, 0xE9, 0x41, 0x2C, 0x87, 0x30, 0x5B, 0x49, 0x62, 0x51,
   };
   edramScaleSignature.vertexShaderSize = 2224;
   edramScaleSignature.pixelShaderSize = 2528;
@@ -1369,8 +1925,7 @@ int main() {
   edramScaleSignature.renderTarget0WriteMask = 15;
   edramScaleSignature.hasExpectedInputLayout = true;
   edramScaleSignature.hasExpectedEdramScaleFixedState = true;
-  CHECK(xeo3::vgpu::detail::IsAc6EdramScalePipeline(
-      edramScaleSignature));
+  CHECK(xeo3::vgpu::detail::IsAc6EdramScalePipeline(edramScaleSignature));
   CHECK(xeo3::vgpu::detail::IsAc6EdramScalePipelineDescriptor(
       edramScaleSignature));
 
@@ -1401,15 +1956,13 @@ int main() {
 
   std::size_t edramLoadShaderSize = 0;
   const auto *const edramLoadShader =
-      xeo3::vgpu::detail::GetAc6EdramLoadFixPixelShader(
-          edramLoadShaderSize);
+      xeo3::vgpu::detail::GetAc6EdramLoadFixPixelShader(edramLoadShaderSize);
   CHECK(edramLoadShader != nullptr);
   CHECK(edramLoadShaderSize == 4200);
   constexpr std::array<std::uint8_t, 32> edramLoadShaderSha256{
-      0xB4, 0x9F, 0x8C, 0x14, 0x21, 0x57, 0x21, 0xDF,
-      0x22, 0x69, 0x31, 0xCA, 0xF5, 0xE4, 0xC7, 0xFD,
-      0xBF, 0xE9, 0xBA, 0xDF, 0xC7, 0x8C, 0xFB, 0xE3,
-      0xDB, 0x76, 0xC1, 0xAB, 0x70, 0xD9, 0x7F, 0xB4,
+      0xB4, 0x9F, 0x8C, 0x14, 0x21, 0x57, 0x21, 0xDF, 0x22, 0x69, 0x31,
+      0xCA, 0xF5, 0xE4, 0xC7, 0xFD, 0xBF, 0xE9, 0xBA, 0xDF, 0xC7, 0x8C,
+      0xFB, 0xE3, 0xDB, 0x76, 0xC1, 0xAB, 0x70, 0xD9, 0x7F, 0xB4,
   };
   CHECK(xeo3::vgpu::detail::HashBytesSha256(
       edramLoadShader, edramLoadShaderSize, computedSha256));
@@ -1421,16 +1974,14 @@ int main() {
           edramTransferVertexShaderSize);
   CHECK(edramTransferVertexShader != nullptr);
   CHECK(edramTransferVertexShaderSize == 2224);
-  constexpr std::array<std::uint8_t, 32>
-      edramTransferVertexShaderSha256{
-          0x7F, 0x3F, 0x8E, 0x0E, 0xEC, 0x40, 0x28, 0xEC,
-          0xCF, 0xBF, 0x2E, 0x63, 0x62, 0x1B, 0x28, 0x04,
-          0x95, 0x28, 0xEC, 0xFA, 0xE2, 0xEC, 0xEC, 0x50,
-          0x45, 0xB5, 0xD6, 0x5E, 0x72, 0xCB, 0xA8, 0x1E,
-      };
-  CHECK(xeo3::vgpu::detail::HashBytesSha256(
-      edramTransferVertexShader, edramTransferVertexShaderSize,
-      computedSha256));
+  constexpr std::array<std::uint8_t, 32> edramTransferVertexShaderSha256{
+      0x7F, 0x3F, 0x8E, 0x0E, 0xEC, 0x40, 0x28, 0xEC, 0xCF, 0xBF, 0x2E,
+      0x63, 0x62, 0x1B, 0x28, 0x04, 0x95, 0x28, 0xEC, 0xFA, 0xE2, 0xEC,
+      0xEC, 0x50, 0x45, 0xB5, 0xD6, 0x5E, 0x72, 0xCB, 0xA8, 0x1E,
+  };
+  CHECK(xeo3::vgpu::detail::HashBytesSha256(edramTransferVertexShader,
+                                            edramTransferVertexShaderSize,
+                                            computedSha256));
   CHECK(computedSha256 == edramTransferVertexShaderSha256);
 
   std::size_t pso341WidthFixShaderSize = 0;
@@ -1440,10 +1991,9 @@ int main() {
   CHECK(pso341WidthFixShader != nullptr);
   CHECK(pso341WidthFixShaderSize == 8708);
   constexpr std::array<std::uint8_t, 32> pso341WidthFixShaderSha256{
-      0x15, 0x8B, 0xF9, 0x3B, 0x7D, 0x29, 0x2D, 0xD4,
-      0x6E, 0xB7, 0x8E, 0xF2, 0x60, 0x5D, 0xFA, 0xFB,
-      0x9D, 0xED, 0xEF, 0x19, 0x71, 0xE3, 0x63, 0x4C,
-      0xDB, 0xF9, 0x07, 0xF5, 0x79, 0x4F, 0xEF, 0x38,
+      0x15, 0x8B, 0xF9, 0x3B, 0x7D, 0x29, 0x2D, 0xD4, 0x6E, 0xB7, 0x8E,
+      0xF2, 0x60, 0x5D, 0xFA, 0xFB, 0x9D, 0xED, 0xEF, 0x19, 0x71, 0xE3,
+      0x63, 0x4C, 0xDB, 0xF9, 0x07, 0xF5, 0x79, 0x4F, 0xEF, 0x38,
   };
   CHECK(xeo3::vgpu::detail::HashBytesSha256(
       pso341WidthFixShader, pso341WidthFixShaderSize, computedSha256));
@@ -1453,10 +2003,9 @@ int main() {
   edramLoadSignature.sampleCount = 1;
   edramLoadSignature.hasExpectedFixedState = false;
   edramLoadSignature.hasExpectedEdramLoadFixedState = true;
-  CHECK(xeo3::vgpu::detail::IsAc6EdramLoadPipeline(
-      edramLoadSignature));
-  CHECK(xeo3::vgpu::detail::IsAc6EdramLoadPipelineDescriptor(
-      edramLoadSignature));
+  CHECK(xeo3::vgpu::detail::IsAc6EdramLoadPipeline(edramLoadSignature));
+  CHECK(
+      xeo3::vgpu::detail::IsAc6EdramLoadPipelineDescriptor(edramLoadSignature));
 
   auto mismatchedEdramLoadSignature = edramLoadSignature;
   mismatchedEdramLoadSignature.pixelShaderSha256[0] ^= 0xFF;
@@ -1510,10 +2059,114 @@ int main() {
   CHECK(!xeo3::vgpu::detail::PatchAc6HalfWidthFullscreenScissor(
       nonFullscreenRecord.data(), nonFullscreenRecord.size()));
 
-  xeo3::vgpu::DrawRecordSignature extractedDrawSignature{};
+  xeo3::vgpu::GraphicsPipelineSignature msaaViewportPipeline{};
+  msaaViewportPipeline.sampleCount = 2;
+  msaaViewportPipeline.sampleQuality = 0;
+  msaaViewportPipeline.renderTargetCount = 1;
+  msaaViewportPipeline.renderTarget0Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  msaaViewportPipeline.depthStencilFormat =
+      DXGI_FORMAT_D32_FLOAT_S8X24_UINT;
+
+  auto msaaViewportRecord = restoreDrawRecord;
+  Store(msaaViewportRecord, 0x34, std::uint32_t{720});
+  Store(msaaViewportRecord, 0xCC, std::uint32_t{22998});
+  Store(msaaViewportRecord, 0xD0, std::uint32_t{17});
+  xeo3::vgpu::DrawRecordSignature msaaViewportDraw{};
   CHECK(xeo3::vgpu::detail::ExtractDrawRecordSignature(
-      restoreDrawRecord.data(), restoreDrawRecord.size(),
-      extractedDrawSignature));
+      msaaViewportRecord.data(), msaaViewportRecord.size(),
+      msaaViewportDraw));
+  CHECK(xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+      msaaViewportDraw, msaaViewportPipeline, restorePipelineState));
+
+  const auto originalMsaaViewportRecord = msaaViewportRecord;
+  std::uint32_t originalViewportWidthBits = 0;
+  std::uint32_t replacementViewportWidthBits = 0;
+  CHECK(xeo3::vgpu::detail::PatchAc6HalfWidthMsaaViewport(
+      msaaViewportRecord.data(), msaaViewportRecord.size(),
+      msaaViewportPipeline, restorePipelineState, originalViewportWidthBits,
+      replacementViewportWidthBits));
+  CHECK(originalViewportWidthBits == 0x44A00000U);
+  CHECK(replacementViewportWidthBits == 0x44200000U);
+  CHECK(Load<std::uint32_t>(msaaViewportRecord, 0x18) == 0x44200000U);
+  auto expectedMsaaViewportRecord = originalMsaaViewportRecord;
+  Store(expectedMsaaViewportRecord, 0x18, std::uint32_t{0x44200000U});
+  CHECK(msaaViewportRecord == expectedMsaaViewportRecord);
+  CHECK(!xeo3::vgpu::detail::PatchAc6HalfWidthMsaaViewport(
+      msaaViewportRecord.data(), msaaViewportRecord.size(),
+      msaaViewportPipeline, restorePipelineState, originalViewportWidthBits,
+      replacementViewportWidthBits));
+  CHECK(originalViewportWidthBits == 0);
+  CHECK(replacementViewportWidthBits == 0);
+  CHECK(!xeo3::vgpu::detail::PatchAc6HalfWidthMsaaViewport(
+      nullptr, originalMsaaViewportRecord.size(), msaaViewportPipeline,
+      restorePipelineState, originalViewportWidthBits,
+      replacementViewportWidthBits));
+  CHECK(!xeo3::vgpu::detail::PatchAc6HalfWidthMsaaViewport(
+      expectedMsaaViewportRecord.data(),
+      xeo3::vgpu::kDrawRecordMinimumSize - 1, msaaViewportPipeline,
+      restorePipelineState, originalViewportWidthBits,
+      replacementViewportWidthBits));
+
+  const auto checkMsaaDrawRejection =
+      [&](const std::size_t offset, const std::uint32_t value) {
+        auto rejectedRecord = originalMsaaViewportRecord;
+        Store(rejectedRecord, offset, value);
+        xeo3::vgpu::DrawRecordSignature rejectedDraw{};
+        return xeo3::vgpu::detail::ExtractDrawRecordSignature(
+                   rejectedRecord.data(), rejectedRecord.size(),
+                   rejectedDraw) &&
+               !xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+                   rejectedDraw, msaaViewportPipeline, restorePipelineState);
+      };
+  CHECK(checkMsaaDrawRejection(0x08, 0));
+  CHECK(checkMsaaDrawRejection(0x10, 0x98760000U));
+  CHECK(checkMsaaDrawRejection(0x18, 0x44200000U));
+  CHECK(checkMsaaDrawRejection(0x1C, 0x44200000U));
+  CHECK(checkMsaaDrawRejection(0x20, 0x3F000000U));
+  CHECK(checkMsaaDrawRejection(0x24, 0x3F000000U));
+  CHECK(checkMsaaDrawRejection(0x28, 0x3F800000U));
+  CHECK(checkMsaaDrawRejection(0x2C, 0x3F800000U));
+  CHECK(checkMsaaDrawRejection(0x30, 1280));
+  CHECK(checkMsaaDrawRejection(0x34, 360));
+  CHECK(checkMsaaDrawRejection(0xC8, 1));
+  CHECK(checkMsaaDrawRejection(0xCC, 0));
+
+  auto nullRecordPipelineDraw = msaaViewportDraw;
+  nullRecordPipelineDraw.pipelineState = 0;
+  CHECK(xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+      nullRecordPipelineDraw, msaaViewportPipeline, restorePipelineState));
+  CHECK(!xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+      msaaViewportDraw, msaaViewportPipeline, nullptr));
+
+  auto rejectedMsaaPipeline = msaaViewportPipeline;
+  rejectedMsaaPipeline.sampleCount = 1;
+  CHECK(!xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+      msaaViewportDraw, rejectedMsaaPipeline, restorePipelineState));
+  rejectedMsaaPipeline = msaaViewportPipeline;
+  rejectedMsaaPipeline.sampleCount = 4;
+  CHECK(!xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+      msaaViewportDraw, rejectedMsaaPipeline, restorePipelineState));
+  rejectedMsaaPipeline = msaaViewportPipeline;
+  rejectedMsaaPipeline.sampleQuality = 1;
+  CHECK(!xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+      msaaViewportDraw, rejectedMsaaPipeline, restorePipelineState));
+  rejectedMsaaPipeline = msaaViewportPipeline;
+  rejectedMsaaPipeline.renderTargetCount = 2;
+  CHECK(!xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+      msaaViewportDraw, rejectedMsaaPipeline, restorePipelineState));
+  rejectedMsaaPipeline = msaaViewportPipeline;
+  rejectedMsaaPipeline.renderTarget0Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+  CHECK(!xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+      msaaViewportDraw, rejectedMsaaPipeline, restorePipelineState));
+  rejectedMsaaPipeline = msaaViewportPipeline;
+  rejectedMsaaPipeline.depthStencilFormat = DXGI_FORMAT_D32_FLOAT;
+  CHECK(!xeo3::vgpu::detail::IsAc6HalfWidthMsaaViewport(
+      msaaViewportDraw, rejectedMsaaPipeline, restorePipelineState));
+
+  xeo3::vgpu::DrawRecordSignature extractedDrawSignature{};
+  CHECK(xeo3::vgpu::detail::ExtractDrawRecordSignature(restoreDrawRecord.data(),
+                                                       restoreDrawRecord.size(),
+                                                       extractedDrawSignature));
   CHECK(extractedDrawSignature.rootSignature ==
         reinterpret_cast<std::uintptr_t>(restoreRootSignature));
   CHECK(extractedDrawSignature.pipelineState ==
@@ -1544,20 +2197,19 @@ int main() {
             pso619DrawSignature, restorePipelineState) ==
         xeo3::vgpu::Ac6EdramDrawPipeline::None);
 
-  constexpr std::array<std::array<std::uint32_t, 4>, 11>
-      loadDrawShapes{{
-          {0x44A00000U, 0x44340000U, 0, 0},
-          {0x44A00000U, 0x44340000U, 160, 96},
-          {0x44A00000U, 0x44340000U, 640, 360},
-          {0x44A00000U, 0x44340000U, 8192, 8192},
-          {0x43200000U, 0x42C00000U, 160, 90},
-          {0x43200000U, 0x42C00000U, 320, 184},
-          {0x43A00000U, 0x43400000U, 208, 144},
-          {0x43A00000U, 0x43400000U, 320, 180},
-          {0x43A00000U, 0x43400000U, 8, 8},
-          {0x43A00000U, 0x43B80000U, 8192, 8192},
-          {0x44200000U, 0x43B80000U, 8192, 8192},
-      }};
+  constexpr std::array<std::array<std::uint32_t, 4>, 11> loadDrawShapes{{
+      {0x44A00000U, 0x44340000U, 0, 0},
+      {0x44A00000U, 0x44340000U, 160, 96},
+      {0x44A00000U, 0x44340000U, 640, 360},
+      {0x44A00000U, 0x44340000U, 8192, 8192},
+      {0x43200000U, 0x42C00000U, 160, 90},
+      {0x43200000U, 0x42C00000U, 320, 184},
+      {0x43A00000U, 0x43400000U, 208, 144},
+      {0x43A00000U, 0x43400000U, 320, 180},
+      {0x43A00000U, 0x43400000U, 8, 8},
+      {0x43A00000U, 0x43B80000U, 8192, 8192},
+      {0x44200000U, 0x43B80000U, 8192, 8192},
+  }};
   for (const auto &shape : loadDrawShapes) {
     auto loadDrawSignature = extractedDrawSignature;
     loadDrawSignature.viewportWidthBits = shape[0];
@@ -1573,8 +2225,8 @@ int main() {
   CHECK(xeo3::vgpu::detail::ClassifyAc6EdramDrawPipeline(
             unrelatedDrawSignature, restorePipelineState) ==
         xeo3::vgpu::Ac6EdramDrawPipeline::None);
-  CHECK(xeo3::vgpu::detail::ClassifyAc6EdramDrawPipeline(
-            scaleDrawSignature, nullptr) ==
+  CHECK(xeo3::vgpu::detail::ClassifyAc6EdramDrawPipeline(scaleDrawSignature,
+                                                         nullptr) ==
         xeo3::vgpu::Ac6EdramDrawPipeline::None);
   CHECK(xeo3::vgpu::detail::ClassifyAc6EdramDrawPipeline(
             scaleDrawSignature,
@@ -1601,32 +2253,190 @@ int main() {
       mismatchedHostRestoreSignature, restorePipelineState,
       xeo3::vgpu::Ac6EdramDrawPipeline::Load, true));
   CHECK(!xeo3::vgpu::detail::ShouldSuppressAc6HostEdramRestoreDraw(
-      extractedDrawSignature, nullptr,
-      xeo3::vgpu::Ac6EdramDrawPipeline::Load, true));
+      extractedDrawSignature, nullptr, xeo3::vgpu::Ac6EdramDrawPipeline::Load,
+      true));
+
+  xeo3::vgpu::Ac6EdramBoundEvidence boundLoad{};
+  auto* traceModule = static_cast<std::uint8_t*>(VirtualAlloc(
+      nullptr, 0x10000, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+  CHECK(traceModule != nullptr);
+  const std::array<std::uint8_t, 10> tracePrologue{
+      0x48, 0x89, 0x5C, 0x24, 0x08, 0x57, 0x48, 0x83, 0xEC, 0x20};
+  const std::array<std::uint8_t, 5> traceCall{0xE8, 0x3A, 0xE9, 0x03, 0x00};
+  const std::array<std::uint8_t, 5> traceOuterCall{0xE8, 0x3C, 0xC6, 0xFF, 0xFF};
+  std::memcpy(traceModule + 0x9280, tracePrologue.data(), tracePrologue.size());
+  std::memcpy(traceModule + 0x92A5, traceCall.data(), traceCall.size());
+  std::memcpy(traceModule + 0xCC3F, traceOuterCall.data(), traceOuterCall.size());
+  std::array<std::uint32_t, 32> traceMetadata{};
+  traceMetadata[1] = 0x1B240000;
+  traceMetadata[5] = 0x18280186;
+  traceMetadata[18] = 1280;
+  traceMetadata[19] = 720;
+  const auto unchangedMetadata = traceMetadata;
+  std::array<std::uintptr_t, 7> traceStack{};
+  traceStack[0] = reinterpret_cast<std::uintptr_t>(traceModule + 0x92AA);
+  traceStack[5] = reinterpret_cast<std::uintptr_t>(traceMetadata.data());
+  traceStack[6] = reinterpret_cast<std::uintptr_t>(traceModule + 0xCC44);
+  const std::array<std::uint32_t, 6> traceOriginal{0, 2, 4, 1, 6, 14400};
+  const std::array<std::uint32_t, 6> traceApplied{0, 0, 4, 1, 6, 14400};
+  xeo3::vgpu::G2HTraceSnapshot traceSnapshot{};
+  CHECK(xeo3::vgpu::detail::CaptureG2HTraceSnapshot(traceModule, traceStack.data(),
+      traceOriginal.data(), traceApplied.data(), 0x80, traceSnapshot));
+  CHECK(traceSnapshot.metadata == traceMetadata);
+  CHECK(traceSnapshot.original == traceOriginal && traceSnapshot.applied == traceApplied);
+  CHECK(traceMetadata == unchangedMetadata);
+  for (int invalidCase = 0; invalidCase < 8; ++invalidCase) {
+    auto badStack = traceStack;
+    auto badOriginal = traceOriginal;
+    auto badApplied = traceApplied;
+    switch (invalidCase) {
+    case 0: badStack[0] += 1; break;
+    case 1: badStack[6] += 1; break;
+    case 2: badStack[5] = 0; break;
+    case 3: badOriginal[1] = 0; break;
+    case 4: badApplied[4] = 7; break;
+    case 5: traceModule[0x9285] ^= 1; break;
+    case 6: traceModule[0x92A5] ^= 1; break;
+    case 7: traceModule[0xCC3F] ^= 1; break;
+    }
+    CHECK(!xeo3::vgpu::detail::CaptureG2HTraceSnapshot(traceModule, badStack.data(),
+        badOriginal.data(), badApplied.data(), 0x80, traceSnapshot));
+    CHECK(traceSnapshot.metadataAddress == 0);
+    std::memcpy(traceModule + 0x9280, tracePrologue.data(), tracePrologue.size());
+    std::memcpy(traceModule + 0x92A5, traceCall.data(), traceCall.size());
+    std::memcpy(traceModule + 0xCC3F, traceOuterCall.data(), traceOuterCall.size());
+  }
+  for (const auto word : {1U, 5U, 18U, 19U}) {
+    traceMetadata = unchangedMetadata;
+    if (word == 1) traceMetadata[word] = 0x20000000;
+    else traceMetadata[word] ^= 1;
+    CHECK(!xeo3::vgpu::detail::CaptureG2HTraceSnapshot(traceModule, traceStack.data(),
+        traceOriginal.data(), traceApplied.data(), 0x80, traceSnapshot));
+  }
+  traceMetadata = unchangedMetadata;
+  DWORD traceOldProtection = 0;
+  CHECK(VirtualProtect(traceModule, 0x10000, PAGE_NOACCESS, &traceOldProtection));
+  CHECK(!xeo3::vgpu::detail::CaptureG2HTraceSnapshot(traceModule, traceStack.data(),
+      traceOriginal.data(), traceApplied.data(), 0x80, traceSnapshot));
+  CHECK(VirtualFree(traceModule, 0, MEM_RELEASE));
+  xeo3::vgpu::ResetG2HTrace();
+  CHECK(BridgeVgpuG2HTraceEnabled == 0 && BridgeVgpuG2HTraceCount == 0);
+  xeo3::vgpu::detail::ConstantDescriptorShadow<8> descriptorShadow;
+  CHECK(!descriptorShadow.Assign(0, 123));
+  CHECK(descriptorShadow.Resolve(0) == 0);
+  CHECK(descriptorShadow.Resolve(0x100) == 0);
+  CHECK(descriptorShadow.Assign(0x100, 0x12340000));
+  CHECK(descriptorShadow.Assign(0x200, descriptorShadow.Resolve(0x100)));
+  CHECK(descriptorShadow.Assign(0x100, 0x56780000));
+  CHECK(descriptorShadow.Resolve(0x200) == 0x12340000);
+  CHECK(descriptorShadow.Assign(0x200, 0));
+  CHECK(descriptorShadow.Resolve(0x200) == 0);
+  CHECK(descriptorShadow.Resolve(0x100) == 0x56780000);
+  for (std::uintptr_t index = 3; index <= 8; ++index)
+    CHECK(descriptorShadow.Assign(index * 0x100, index));
+  CHECK(!descriptorShadow.Assign(0x900, 9));
+  CHECK(descriptorShadow.Resolve(0x900) == 0);
+  CHECK(descriptorShadow.Assign(0x100, 12));
+  CHECK(descriptorShadow.Resolve(0x100) == 12);
+  descriptorShadow.Clear();
+  CHECK(descriptorShadow.Resolve(0x100) == 0);
+  CHECK(descriptorShadow.Assign(0x900, 9));
+  boundLoad.renderTargetCount = 1;
+  boundLoad.viewFormat = DXGI_FORMAT_R8G8B8A8_UINT;
+  boundLoad.sampleCount = 1;
+  boundLoad.targetWidth = 1280;
+  boundLoad.targetHeight = 720;
+  boundLoad.hasConstants = true;
+  boundLoad.rootTableMask = 3;
+  boundLoad.constants = {
+      0, 0, 1280, 720, 0, 0, 1280, 720, 1280, 2048, 1280, 720, 1, 0, 0, 16};
+  auto boundScale = boundLoad;
+  boundScale.sampleCount = 4;
+  boundScale.targetWidth = 640;
+  boundScale.targetHeight = 360;
+  boundScale.constants[6] = boundScale.constants[10] = 640;
+  boundScale.constants[7] = boundScale.constants[11] = 360;
+  CHECK(xeo3::vgpu::detail::ClassifyAc6BoundEdramDraw(
+            extractedDrawSignature, restorePipelineState, boundLoad) ==
+        xeo3::vgpu::Ac6EdramDrawPipeline::Load);
+  CHECK(xeo3::vgpu::detail::ClassifyAc6BoundEdramDraw(
+            scaleDrawSignature, restorePipelineState, boundScale) ==
+        xeo3::vgpu::Ac6EdramDrawPipeline::Scale);
+  CHECK(xeo3::vgpu::detail::ClassifyAc6BoundEdramDraw(
+            extractedDrawSignature, restorePipelineState, boundScale) ==
+        xeo3::vgpu::Ac6EdramDrawPipeline::None);
+  CHECK(xeo3::vgpu::detail::ClassifyAc6BoundEdramDraw(
+            scaleDrawSignature, restorePipelineState, boundLoad) ==
+        xeo3::vgpu::Ac6EdramDrawPipeline::None);
+  CHECK(xeo3::vgpu::detail::ClassifyAc6BoundEdramDraw(
+            extractedDrawSignature, nullptr, boundLoad) ==
+        xeo3::vgpu::Ac6EdramDrawPipeline::None);
+  CHECK(xeo3::vgpu::detail::ClassifyAc6BoundEdramDraw(
+            unrelatedDrawSignature, restorePipelineState, boundScale) ==
+        xeo3::vgpu::Ac6EdramDrawPipeline::None);
+  for (std::size_t index = 0; index < boundLoad.constants.size(); ++index) {
+    auto corruptedLoad = boundLoad;
+    auto corruptedScale = boundScale;
+    corruptedLoad.constants[index] ^= 1;
+    corruptedScale.constants[index] ^= 1;
+    CHECK(xeo3::vgpu::detail::ClassifyAc6BoundEdramDraw(
+              extractedDrawSignature, restorePipelineState, corruptedLoad) ==
+          xeo3::vgpu::Ac6EdramDrawPipeline::None);
+    CHECK(xeo3::vgpu::detail::ClassifyAc6BoundEdramDraw(
+              scaleDrawSignature, restorePipelineState, corruptedScale) ==
+          xeo3::vgpu::Ac6EdramDrawPipeline::None);
+  }
+  for (std::uint32_t index = 0; index < 10; ++index) {
+    auto invalid = boundLoad;
+    switch (index) {
+    case 0: invalid.renderTargetCount = 0; break;
+    case 1: invalid.renderTargetCount = 2; break;
+    case 2: invalid.viewFormat = DXGI_FORMAT_R8G8B8A8_UNORM; break;
+    case 3: invalid.sampleCount = 4; break;
+    case 4: invalid.targetWidth = 1279; break;
+    case 5: invalid.targetHeight = 719; break;
+    case 6: invalid.hasDepthStencil = true; break;
+    case 7: invalid.hasConstants = false; break;
+    case 8: invalid.rootTableMask = 1; break;
+    case 9: invalid.rootTableMask = 2; break;
+    }
+    CHECK(xeo3::vgpu::detail::ClassifyAc6BoundEdramDraw(
+              extractedDrawSignature, restorePipelineState, invalid) ==
+          xeo3::vgpu::Ac6EdramDrawPipeline::None);
+  }
+  constexpr std::array<std::uint8_t, 32> pixOpaqueDigest{
+      0x13, 0xC9, 0xE5, 0xC8, 0x2B, 0xA9, 0x3E, 0xD0,
+      0xC1, 0xBE, 0x12, 0xD4, 0x13, 0x7E, 0xCD, 0x15,
+      0xF8, 0xA1, 0x45, 0xE4, 0x4E, 0x02, 0xDC, 0xE5,
+      0x20, 0x5D, 0xF2, 0x1A, 0x13, 0xB4, 0xE7, 0xB2};
+  CHECK(xeo3::vgpu::detail::IsPixOpaquePipelineBlob(848, pixOpaqueDigest));
+  CHECK(!xeo3::vgpu::detail::IsPixOpaquePipelineBlob(954, pixOpaqueDigest));
+  auto badOpaqueDigest = pixOpaqueDigest;
+  badOpaqueDigest[0] ^= 1;
+  CHECK(!xeo3::vgpu::detail::IsPixOpaquePipelineBlob(848, badOpaqueDigest));
+  // The shared PIX blob, on its own, must never identify either pipeline.
+  CHECK(xeo3::vgpu::detail::ClassifyAc6EdramCachedPipelineBlob(
+            848, pixOpaqueDigest) == xeo3::vgpu::Ac6EdramDrawPipeline::None);
 
   constexpr std::array<std::uint8_t, 32> loadCachedBlobSha256{
-      0x5E, 0xE6, 0xE2, 0xC4, 0x21, 0xA6, 0xE2, 0xF1,
-      0x31, 0x17, 0x1E, 0x1B, 0x2E, 0x1C, 0x2B, 0x5E,
-      0x6F, 0x77, 0xF2, 0xA1, 0xE3, 0x6B, 0x25, 0xDD,
-      0x99, 0x8A, 0x59, 0x12, 0xAF, 0x17, 0x97, 0x11,
+      0x5E, 0xE6, 0xE2, 0xC4, 0x21, 0xA6, 0xE2, 0xF1, 0x31, 0x17, 0x1E,
+      0x1B, 0x2E, 0x1C, 0x2B, 0x5E, 0x6F, 0x77, 0xF2, 0xA1, 0xE3, 0x6B,
+      0x25, 0xDD, 0x99, 0x8A, 0x59, 0x12, 0xAF, 0x17, 0x97, 0x11,
   };
   constexpr std::array<std::uint8_t, 32> scaleCachedBlobSha256{
-      0xBC, 0xFC, 0x09, 0x66, 0x3F, 0x3E, 0x30, 0x80,
-      0x3D, 0x7A, 0xF5, 0x09, 0xA0, 0xFD, 0x9F, 0xAD,
-      0xFD, 0x3E, 0x31, 0x70, 0x23, 0xB5, 0x46, 0xFC,
-      0x9C, 0x08, 0xA8, 0xEE, 0xAD, 0xDA, 0x71, 0xBE,
+      0xBC, 0xFC, 0x09, 0x66, 0x3F, 0x3E, 0x30, 0x80, 0x3D, 0x7A, 0xF5,
+      0x09, 0xA0, 0xFD, 0x9F, 0xAD, 0xFD, 0x3E, 0x31, 0x70, 0x23, 0xB5,
+      0x46, 0xFC, 0x9C, 0x08, 0xA8, 0xEE, 0xAD, 0xDA, 0x71, 0xBE,
   };
   constexpr std::array<std::uint8_t, 32> currentLoadCachedBlobSha256{
-      0xC7, 0xCA, 0xC6, 0xC6, 0xB4, 0x75, 0x39, 0x00,
-      0x00, 0x44, 0x8A, 0xBE, 0x06, 0x83, 0x15, 0x39,
-      0x66, 0x87, 0x3E, 0xA7, 0x3F, 0x3F, 0xC0, 0xCC,
-      0x49, 0x8B, 0x54, 0x90, 0x97, 0x35, 0xF6, 0x74,
+      0xC7, 0xCA, 0xC6, 0xC6, 0xB4, 0x75, 0x39, 0x00, 0x00, 0x44, 0x8A,
+      0xBE, 0x06, 0x83, 0x15, 0x39, 0x66, 0x87, 0x3E, 0xA7, 0x3F, 0x3F,
+      0xC0, 0xCC, 0x49, 0x8B, 0x54, 0x90, 0x97, 0x35, 0xF6, 0x74,
   };
   constexpr std::array<std::uint8_t, 32> currentScaleCachedBlobSha256{
-      0x16, 0xE9, 0x02, 0xC9, 0xF0, 0xD5, 0x32, 0xB3,
-      0x0D, 0x1C, 0xC0, 0x7E, 0xE2, 0xB7, 0xCD, 0xE5,
-      0x5F, 0x4F, 0x00, 0x5A, 0xDE, 0x82, 0x9A, 0x5A,
-      0x83, 0x6D, 0xB4, 0xFF, 0xF9, 0x98, 0x1D, 0x87,
+      0x16, 0xE9, 0x02, 0xC9, 0xF0, 0xD5, 0x32, 0xB3, 0x0D, 0x1C, 0xC0,
+      0x7E, 0xE2, 0xB7, 0xCD, 0xE5, 0x5F, 0x4F, 0x00, 0x5A, 0xDE, 0x82,
+      0x9A, 0x5A, 0x83, 0x6D, 0xB4, 0xFF, 0xF9, 0x98, 0x1D, 0x87,
   };
   CHECK(xeo3::vgpu::detail::ClassifyAc6EdramCachedPipelineBlob(
             954, loadCachedBlobSha256) ==
@@ -1678,24 +2488,23 @@ int main() {
   auto mismatchedRestoreDrawRecord = restoreDrawRecord;
   Store(mismatchedRestoreDrawRecord, 0x30, std::uint32_t{1280});
   CHECK(!xeo3::vgpu::detail::IsAc6CorruptEdramRestoreDrawRecord(
-      mismatchedRestoreDrawRecord.data(),
-      mismatchedRestoreDrawRecord.size(), restorePipelineState));
+      mismatchedRestoreDrawRecord.data(), mismatchedRestoreDrawRecord.size(),
+      restorePipelineState));
   mismatchedRestoreDrawRecord = restoreDrawRecord;
   Store(mismatchedRestoreDrawRecord, 0x34, std::uint32_t{720});
   CHECK(!xeo3::vgpu::detail::IsAc6CorruptEdramRestoreDrawRecord(
-      mismatchedRestoreDrawRecord.data(),
-      mismatchedRestoreDrawRecord.size(), restorePipelineState));
+      mismatchedRestoreDrawRecord.data(), mismatchedRestoreDrawRecord.size(),
+      restorePipelineState));
   mismatchedRestoreDrawRecord = restoreDrawRecord;
   Store(mismatchedRestoreDrawRecord, 0xCC, std::uint32_t{4});
   CHECK(!xeo3::vgpu::detail::IsAc6CorruptEdramRestoreDrawRecord(
-      mismatchedRestoreDrawRecord.data(),
-      mismatchedRestoreDrawRecord.size(), restorePipelineState));
+      mismatchedRestoreDrawRecord.data(), mismatchedRestoreDrawRecord.size(),
+      restorePipelineState));
 
   constexpr std::array<std::uint8_t, 32> restoreCachedBlobSha256{
-      0x52, 0x73, 0x70, 0x28, 0xBA, 0xFA, 0x14, 0x4C,
-      0x68, 0x48, 0x4A, 0x49, 0x5F, 0x75, 0x72, 0xF1,
-      0x17, 0x9E, 0xA7, 0xB9, 0xF1, 0x18, 0x8F, 0xB9,
-      0x9A, 0xD6, 0xA9, 0x90, 0x61, 0xDD, 0x28, 0xC4,
+      0x52, 0x73, 0x70, 0x28, 0xBA, 0xFA, 0x14, 0x4C, 0x68, 0x48, 0x4A,
+      0x49, 0x5F, 0x75, 0x72, 0xF1, 0x17, 0x9E, 0xA7, 0xB9, 0xF1, 0x18,
+      0x8F, 0xB9, 0x9A, 0xD6, 0xA9, 0x90, 0x61, 0xDD, 0x28, 0xC4,
   };
   CHECK(xeo3::vgpu::detail::IsAc6CorruptEdramRestoreCachedBlob(
       954, restoreCachedBlobSha256));

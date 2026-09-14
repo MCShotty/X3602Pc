@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 6,
+  "inherits": "2607.2223.1.0-D1578E07.json",
+  "package": {
+    "name": "Xbox360BackwardCompatibil.PrimaryFuzionFrenzyFuzio",
+    "familyName": "Xbox360BackwardCompatibil.PrimaryFuzionFrenzyFuzio_ksqcvrsvwz2jp",
+    "version": "2608.3123.1.0"
+  },
+  "emu": {
+    "sha256": "D1578E07B533E391D8A81C330D5493BA2D45B252490A818EC148DABE1BA24D06",
+    "imageBase": "0x140000000",
+    "peTimestamp": "0x6A585A77",
+    "sizeOfImage": "0x00D97000",
+    "source": "unchanged lab Emu.exe; installed package executable is not used"
+  },
+  "vgpuDx12": {
+    "sha256": "8306B4C06B100CAE18F91DCCD0468C2210CCA11A02D928025DE59BD827610247",
+    "peTimestamp": "0x6A8FB92D",
+    "sizeOfImage": "0x0073E000",
+    "source": "installed package graph",
+    "hookRvas": {
+      "fetchTable": "0x00014178",
+      "shaderCompile": "0x0002C3BC",
+      "xenosTranslate": "0x0003C970",
+      "textureTransfer": "0x000756B0",
+      "structuredTextureTransfer": "0x00075838",
+      "constantUpload": "0x00047BE4",
+      "nullPipelineStateGuard": "0x0000E926",
+      "nullPipelineStateNormal": "0x0000E938",
+      "nullPipelineStateSkip": "0x0000E90E",
+      "samplerAddressModeTable": "0x00414BE0",
+      "tightAlignmentGate": "0x00017D90",
+      "placedResourceGate": "0x00017DF1",
+      "createHeapCall": "0x0004435B",
+      "modernPlacedResourceCall": "0x00017E35",
+      "legacyPlacedResourceCall": "0x0005C8B0",
+      "secondaryModernPlacedResourceCall": "0x0004E0A2",
+      "coldLegacyPlacedResourceSequence": "0x000686C7",
+      "coldLegacyPlacedResourceCall": "0x000686CA",
+      "allocator": "0x00047450",
+      "uploadInterfacePointer": "0x005F79D8"
+    },
+    "tightAlignmentGateBytes": "0F85B44A0400",
+    "placedResourceGateBytes": "0F84864A0400",
+    "staticEvidence": {
+      "referenceSha256": "67F36AE3E36A7BFD3EF99DAAF6DE64A72DA552ECDF83AD41FB23D393D2B3992C",
+      "exactNormalizedInstructionMatches": [
+        "fetchTable", "shaderCompile", "xenosTranslate", "textureTransfer",
+        "structuredTextureTransfer", "constantUpload", "nullPipelineStateGuard",
+        "allocator", "legacyPlacedResourceCall", "secondaryModernPlacedResourceCall",
+        "coldLegacyPlacedResourceSequence"
+      ],
+      "normalization": "Ignore RIP-relative displacements and direct branch/call destinations; retain register operands, non-relative immediates and memory field offsets.",
+      "modernPlacedResourceDifference": "The native capability field moved from +0x44 to +0x5C; the adapter does not access that field.",
+      "heapDifferences": "Native RSI/RDI allocation swap and capability fields moved by +0x18; CreateHeap arguments and COM slot +0xE0 are unchanged.",
+      "allocatorCallRva": "0x00014288",
+      "uploadPointerLoadRva": "0x000142C8"
+    },
+    "status": "confirmed loaded and hooks installed on 2026-09-14; Mission 01 reaches gameplay; rendering and stability acceptance remain open"
+  },
+  "flashKernel": {
+    "path": "Flash/xboxkrnlcf.bin",
+    "sha256": "DA5BE614FB51B5809D70DA073F406F071E5CCB1F8C0EBCD57DAFBAB31B519BDD",
+    "size": 1507328
+  },
+  "kernelAot": {
+    "module": "xeo3_5fb3687c_001748c4.dll",
+    "sha256": "27CA5876B505361F00C3E1021FF06B68CD666987D4B517C934D69AADF44E8651",
+    "peTimestamp": "0x6A588000",
+    "sizeOfImage": "0x0013E000",
+    "source": "lab; loaded path confirmed in process 26848 on 2026-09-14",
+    "bugCheckExHostRva": "0x00021899",
+    "bugCheckExHostBytesSha256": "7E106F74FB128E76C63F5C21CEC574BD040AE9A5F213D718AD871ED8B3D3B15C",
+    "status": "confirmed loaded; unchanged from preceding profile"
+  },
+  "packageKernelAot": {
+    "module": "xeo3_5fb3687c_001748c4.dll",
+    "sha256": "94EA97345F160B9969058422366A72FD182C06B2DA64E72DED98D7E2EEB50637",
+    "peTimestamp": "0x6A967651",
+    "sizeOfImage": "0x0013E000",
+    "source": "installed package; not selected by the observed lab launch",
+    "bugCheckExHostRva": "0x00021899",
+    "bugCheckExHostBytesSha256": "7E106F74FB128E76C63F5C21CEC574BD040AE9A5F213D718AD871ED8B3D3B15C",
+    "staticEvidence": "Entire .text, .data, .pdata and .reloc sections are byte-identical to the 27CA5876 reference kernel AOT.",
+    "status": "static-verified; live validation pending"
+  }
+}

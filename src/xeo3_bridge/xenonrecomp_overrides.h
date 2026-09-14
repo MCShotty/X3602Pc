@@ -1,5 +1,6 @@
 #pragma once
 
+#include "xeo3_bridge/ac6_audio_poll.h"
 #include "xeo3_bridge/ac6_queue_wait.h"
 #include "xeo3_bridge/xeo3_cpu_state.h"
 
@@ -10,6 +11,8 @@
 
 #define PPC_CONTEXT_EXTENSION \
     void* xeo3CpuState = nullptr; \
+    void* xeo3ActiveFrame = nullptr; \
+    std::uint8_t* xeo3GuestMemory = nullptr; \
     std::uint32_t xeo3GuestIar = 0; \
     std::uint32_t xeo3IndirectCallsUntilSync = 16;
 
@@ -17,6 +20,18 @@ struct PPCContext;
 
 extern "C"
 {
+extern __declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollClockFallbackEnabled;
+extern __declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollTraceEnabled;
+extern __declspec(dllexport) volatile std::uint32_t
+    BridgeGuestIarTelemetryEnabled;
+extern __declspec(dllexport) volatile std::uint32_t
+    BridgeContinuousStatePublicationMode;
+std::uint32_t BridgeAc6AudioPollResolveTick(
+    std::uint32_t guestTick,
+    std::uint8_t* guestMemory,
+    std::uint32_t frameAddress) noexcept;
 #if defined(XEO3_RUNTIME_TELEMETRY)
 extern __declspec(dllexport) volatile std::uint64_t BridgeWorkerEntryCount;
 extern __declspec(dllexport) volatile std::uint64_t BridgeWorkerLoopCount;
@@ -44,16 +59,115 @@ extern __declspec(dllexport) volatile std::uint32_t BridgeActiveWorkerPrimaryThr
 extern __declspec(dllexport) volatile std::uint64_t BridgeActiveWorkerPrimaryClaimCount;
 extern __declspec(dllexport) volatile std::uint32_t BridgeLastWorkerDestroyTarget;
 extern __declspec(dllexport) volatile std::uint32_t BridgeLastWorkerDestroyObject;
+extern __declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollCallCount;
+extern __declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollReturnCount;
+extern __declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollSampleCount;
+extern __declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollContinueCount;
+extern __declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollTimeoutCount;
+extern __declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollExitCount;
+extern __declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollTimeBaseSampleCount;
+extern __declspec(dllexport) volatile std::uint64_t
+    BridgeAc6AudioPollClockFallbackCount;
+extern __declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollDelayCount;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastGuestIar;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastThreadId;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastObject;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastFrame;
+extern __declspec(dllexport) volatile std::uintptr_t BridgeAc6AudioPollLastGuestMemory;
+extern __declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollLastTimeBase;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastGlobalTick;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastGlobalClock;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastObjectClock;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastBaselineTick;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastDelta;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastConsumerPointer;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastConsumerValue;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastObservedConsumer;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastRequiredDistance;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastAvailableDistance;
+extern __declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastReturn;
+extern __declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollLastResolvedTick;
 #endif
 void BridgeQueueWaitCooperativeYield(
     std::uint32_t objectAddress,
     std::uint32_t count) noexcept;
+#if defined(XEO3_RUNTIME_TELEMETRY)
+void BridgeAc6AudioPollObserve(
+    std::uint32_t guestIar,
+    std::uint32_t r3,
+    std::uint32_t r9,
+    std::uint32_t r10,
+    std::uint64_t r11,
+    std::uint32_t r13,
+    std::uint32_t r29,
+    std::uint32_t r30,
+    std::uint32_t r31) noexcept;
+#endif
 }
 
 namespace xeo3
 {
 constexpr std::uint32_t kGuestPhysicalAddressBase = 0xA0000000U;
 constexpr std::uint32_t kIndirectStateSyncInterval = 16U;
+#if defined(XEO3_CONTINUOUS_STATE_PUBLICATION)
+inline constexpr bool kContinuousStatePublicationEnabled = true;
+#else
+inline constexpr bool kContinuousStatePublicationEnabled = false;
+#endif
+
+constexpr bool IsWorkerProbeInstruction(
+    const std::uint32_t guestIar) noexcept
+{
+    switch (guestIar)
+    {
+    case 0x82346428U:
+    case 0x8234643CU:
+    case 0x823464BCU:
+    case 0x823464C0U:
+    case 0x82346530U:
+    case 0x823466ACU:
+    case 0x823466B0U:
+        return true;
+    default:
+        return false;
+    }
+}
+
+constexpr bool IsAudioPollTraceInstruction(
+    const std::uint32_t guestIar) noexcept
+{
+    switch (guestIar)
+    {
+    case 0x821E6238U:
+    case 0x821E6240U:
+    case 0x821E6248U:
+    case 0x821E6264U:
+    case 0x821E6B3CU:
+    case 0x821E6B70U:
+    case 0x821E6B74U:
+    case 0x821E6B78U:
+    case 0x821E6B80U:
+    case 0x821E6B88U:
+    case 0x821E6B90U:
+        return true;
+    default:
+        return false;
+    }
+}
+
+constexpr bool HasGuestIarHook(const std::uint32_t guestIar) noexcept
+{
+    return guestIar == 0x821E6B38U ||
+           ac6_audio::IsDelay16CycleInstruction(guestIar) ||
+           IsWorkerProbeInstruction(guestIar) ||
+           IsAudioPollTraceInstruction(guestIar);
+}
+
+static_assert(HasGuestIarHook(0x821E6AE4U));
+static_assert(HasGuestIarHook(0x821E6B38U));
+static_assert(HasGuestIarHook(0x823466B0U));
+static_assert(!HasGuestIarHook(0x82090000U));
 
 inline void RecordWorkerProbeIar(const std::uint32_t guestIar) noexcept
 {
@@ -139,29 +253,102 @@ inline std::uint8_t* GuestMemoryPointer(
     return guestMemory + guestAddress;
 }
 
-inline void TrackGuestIar(
+__forceinline void TrackGuestIar(
     const std::uint32_t guestIar,
+    std::uint8_t* const guestMemory,
+    const std::uint32_t r3,
+    const std::uint32_t r9,
+    const std::uint32_t r10,
     const std::uint32_t r29,
-    const std::uint32_t r11) noexcept
+    const std::uint64_t r11,
+    const std::uint32_t r13,
+    std::uint64_t& r30,
+    const std::uint32_t r31) noexcept
 {
-    RecordWorkerProbeIar(guestIar);
 #if defined(XEO3_RUNTIME_TELEMETRY)
-    if (guestIar == 0x823466ACU)
+    if (guestIar == 0x821E6B38U)
     {
-        BridgeLastQueueWaitObject = r29;
-        BridgeLastQueueWaitCount = 0xFFFFFFFFU;
-    }
-    else if (guestIar == 0x823466B0U)
-    {
-        RecordQueueWaitProbe(r29, r11);
+        r30 = BridgeAc6AudioPollResolveTick(
+            static_cast<std::uint32_t>(r30),
+            guestMemory,
+            r31);
     }
 #else
+    static_cast<void>(guestMemory);
+#endif
+    if (ac6_audio::IsDelay16CycleInstruction(guestIar))
+    {
+        _mm_pause();
+#if defined(XEO3_RUNTIME_TELEMETRY)
+        if (BridgeAc6AudioPollTraceEnabled != 0)
+        {
+            BridgeAc6AudioPollDelayCount = BridgeAc6AudioPollDelayCount + 1;
+        }
+#endif
+    }
+
+#if defined(XEO3_RUNTIME_TELEMETRY)
+    if ((guestIar & 0xFFFF0000U) == 0x82340000U &&
+        BridgeGuestIarTelemetryEnabled != 0)
+    {
+        RecordWorkerProbeIar(guestIar);
+        if (guestIar == 0x823466ACU)
+        {
+            BridgeLastQueueWaitObject = r29;
+            BridgeLastQueueWaitCount = 0xFFFFFFFFU;
+        }
+        else if (guestIar == 0x823466B0U)
+        {
+            RecordQueueWaitProbe(r29, static_cast<std::uint32_t>(r11));
+        }
+    }
+
+    if (guestIar - 0x821E6238U <= 0x00000958U &&
+        BridgeAc6AudioPollTraceEnabled != 0)
+    {
+        switch (guestIar)
+        {
+        case 0x821E6238U:
+        case 0x821E6240U:
+        case 0x821E6248U:
+        case 0x821E6264U:
+        case 0x821E6B3CU:
+        case 0x821E6B70U:
+        case 0x821E6B74U:
+        case 0x821E6B78U:
+        case 0x821E6B80U:
+        case 0x821E6B88U:
+        case 0x821E6B90U:
+            BridgeAc6AudioPollObserve(
+                guestIar,
+                r3,
+                r9,
+                r10,
+                r11,
+                r13,
+                r29,
+                static_cast<std::uint32_t>(r30),
+                r31);
+            break;
+        default:
+            break;
+        }
+    }
+#else
+    static_cast<void>(r3);
+    static_cast<void>(r9);
+    static_cast<void>(r10);
     static_cast<void>(r29);
     static_cast<void>(r11);
+    static_cast<void>(r13);
+    static_cast<void>(r30);
+    static_cast<void>(r31);
 #endif
     if (guestIar == 0x823466B0U)
     {
-        BridgeQueueWaitCooperativeYield(r29, r11);
+        BridgeQueueWaitCooperativeYield(
+            r29,
+            static_cast<std::uint32_t>(r11));
     }
 }
 
@@ -456,19 +643,38 @@ inline void StoreU64(
 #define PPC_PUBLISH_STACK_POINTER() \
     ::xeo3::PublishStackPointer(ctx, base)
 
+#if defined(XEO3_CONTINUOUS_STATE_PUBLICATION)
+#define XEO3_PUBLISH_GUEST_IAR() \
+    ::xeo3::PublishIarValue( \
+        ctx.xeo3CpuState, \
+        ctx.xeo3GuestIar)
+#else
+#define XEO3_PUBLISH_GUEST_IAR() static_cast<void>(0)
+#endif
+
 #define PPC_SET_GUEST_IAR(address) \
     do \
     { \
         ctx.xeo3GuestIar = static_cast<std::uint32_t>(address); \
-        ::xeo3::PublishIarValue( \
-            ctx.xeo3CpuState, \
-            ctx.xeo3GuestIar); \
-        ::xeo3::TrackGuestIar( \
-            ctx.xeo3GuestIar, \
-            ctx.r29.u32, \
-            ctx.r11.u32); \
+        XEO3_PUBLISH_GUEST_IAR(); \
+        if constexpr (::xeo3::HasGuestIarHook( \
+                          static_cast<std::uint32_t>(address))) \
+        { \
+            ::xeo3::TrackGuestIar( \
+                ctx.xeo3GuestIar, \
+                ctx.xeo3GuestMemory, \
+                ctx.r3.u32, \
+                ctx.r9.u32, \
+                ctx.r10.u32, \
+                ctx.r29.u32, \
+                ctx.r11.u64, \
+                ctx.r13.u32, \
+                ctx.r30.u64, \
+                ctx.r31.u32); \
+        } \
     } while (false)
 
+#if defined(XEO3_CONTINUOUS_STATE_PUBLICATION)
 #define PPC_PUBLISH_GPR(index) \
     do \
     { \
@@ -523,6 +729,18 @@ inline void StoreU64(
 
 #define PPC_PUBLISH_MSR() \
     ::xeo3::PublishMsrValue(ctx.xeo3CpuState, ctx.msr)
+#else
+#define PPC_PUBLISH_GPR(index) static_cast<void>(0)
+#define PPC_PUBLISH_FPR(index) static_cast<void>(0)
+#define PPC_PUBLISH_VECTOR(index) static_cast<void>(0)
+#define PPC_PUBLISH_CR(index) static_cast<void>(0)
+#define PPC_PUBLISH_LR() static_cast<void>(0)
+#define PPC_PUBLISH_CTR() static_cast<void>(0)
+#define PPC_PUBLISH_XER() static_cast<void>(0)
+#define PPC_PUBLISH_FPSCR() static_cast<void>(0)
+#define PPC_PUBLISH_VSCR() static_cast<void>(0)
+#define PPC_PUBLISH_MSR() static_cast<void>(0)
+#endif
 
 #define PPC_MM_LOAD_U32(address) \
     ::xeo3::MmioLoad32(ctx, base, static_cast<std::uint32_t>(address))

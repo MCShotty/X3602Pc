@@ -1,0 +1,340 @@
+diff --git a/src/xenia/gpu/d3d12/d3d12_command_processor.cc b/src/xenia/gpu/d3d12/d3d12_command_processor.cc
+index 0ec70a7d..65b98689 100644
+--- a/src/xenia/gpu/d3d12/d3d12_command_processor.cc
++++ b/src/xenia/gpu/d3d12/d3d12_command_processor.cc
+@@ -84,11 +84,9 @@ void D3D12CommandProcessor::InitializeShaderStorage(
+ 
+ void D3D12CommandProcessor::RequestFrameTrace(
+     const std::filesystem::path& root_path) {
+-  // Capture with PIX if attached.
+-  if (GetD3D12Provider().GetGraphicsAnalysis() != nullptr) {
+-    pix_capture_requested_.store(true, std::memory_order_relaxed);
+-    return;
+-  }
++  // Keep Xenia's portable XTR path available when Windows Graphics Tools is
++  // installed. The stock behavior diverts F4 to PIX whenever
++  // IDXGraphicsAnalysis is present, even when no PIX capture session exists.
+   CommandProcessor::RequestFrameTrace(root_path);
+ }
+ 
+diff --git a/src/xenia/gpu/dxbc_shader_translator_fetch.cc b/src/xenia/gpu/dxbc_shader_translator_fetch.cc
+index 64ee66b9..bcc539ea 100644
+--- a/src/xenia/gpu/dxbc_shader_translator_fetch.cc
++++ b/src/xenia/gpu/dxbc_shader_translator_fetch.cc
+@@ -17,6 +17,7 @@
+ #include "xenia/base/math.h"
+ #include "xenia/base/string.h"
+ #include "xenia/gpu/dxbc_shader_translator.h"
++#include "xenia/gpu/gpu_flags.h"
+ #include "xenia/gpu/render_target_cache.h"
+ 
+ namespace xe {
+@@ -84,6 +85,9 @@ void DxbcShaderTranslator::ProcessVertexFetchInstruction(
+         if (instr.attributes.is_index_rounded) {
+           a_.OpAdd(address_dest, index_operand, dxbc::Src::LF(0.5f));
+           a_.OpRoundNI(address_dest, address_src);
++        } else if (cvars::ac6_ground_fix) {
++          a_.OpAdd(address_dest, index_operand, dxbc::Src::LF(0.00025f));
++          a_.OpRoundNI(address_dest, address_src);
+         } else {
+           a_.OpRoundNI(address_dest, index_operand);
+         }
+diff --git a/src/xenia/gpu/gpu_flags.cc b/src/xenia/gpu/gpu_flags.cc
+index 1b9bd065..eb1723e2 100644
+--- a/src/xenia/gpu/gpu_flags.cc
++++ b/src/xenia/gpu/gpu_flags.cc
+@@ -55,3 +55,9 @@ DEFINE_int32(query_occlusion_fake_sample_count, 1000,
+              "EVENT_WRITE_ZPD by this number. Setting this to 0 means "
+              "everything is reported as occluded.",
+              "GPU");
++
++DEFINE_bool(
++    ac6_ground_fix, false,
++    "Apply the Ace Combat 6 non-rounded vertex-fetch index bias. Use only in "
++    "Ace Combat 6.",
++    "HACKS");
+diff --git a/src/xenia/gpu/gpu_flags.h b/src/xenia/gpu/gpu_flags.h
+index e057faaa..81882353 100644
+--- a/src/xenia/gpu/gpu_flags.h
++++ b/src/xenia/gpu/gpu_flags.h
+@@ -26,6 +26,8 @@ DECLARE_bool(half_pixel_offset);
+ 
+ DECLARE_int32(query_occlusion_fake_sample_count);
+ 
++DECLARE_bool(ac6_ground_fix);
++
+ #define XE_GPU_FINE_GRAINED_DRAW_SCOPES 1
+ 
+ #endif  // XENIA_GPU_GPU_FLAGS_H_
+diff --git a/src/xenia/gpu/trace_dump.cc b/src/xenia/gpu/trace_dump.cc
+index 4cf774c4..f1e05820 100644
+--- a/src/xenia/gpu/trace_dump.cc
++++ b/src/xenia/gpu/trace_dump.cc
+@@ -17,6 +17,9 @@
+ #include "xenia/base/threading.h"
+ #include "xenia/gpu/command_processor.h"
+ #include "xenia/gpu/graphics_system.h"
++#include "xenia/gpu/register_file.h"
++#include "xenia/gpu/registers.h"
++#include "xenia/gpu/shader.h"
+ #include "xenia/memory.h"
+ #include "xenia/ui/file_picker.h"
+ #include "xenia/ui/presenter.h"
+@@ -121,9 +124,226 @@ bool TraceDump::Load(const std::filesystem::path& trace_file_path) {
+ int TraceDump::Run() {
+   BeginHostCapture();
+   player_->SeekFrame(0);
+-  player_->SeekCommand(
+-      static_cast<int>(player_->current_frame()->commands.size() - 1));
+-  player_->WaitOnPlayback();
++  const auto* frame = player_->current_frame();
++  if (!frame || frame->commands.empty()) {
++    XELOGE("Trace contains no commands in frame 0");
++    EndHostCapture();
++    player_.reset();
++    emulator_.reset();
++    return 2;
++  }
++
++  auto draw_state_path = base_output_path_;
++  draw_state_path.replace_extension(".draws.tsv");
++  auto texture_state_path = base_output_path_;
++  texture_state_path.replace_extension(".textures.tsv");
++  auto vertex_state_path = base_output_path_;
++  vertex_state_path.replace_extension(".vertices.tsv");
++  FILE* draw_state_file = filesystem::OpenFile(draw_state_path, "wb");
++  FILE* texture_state_file = filesystem::OpenFile(texture_state_path, "wb");
++  FILE* vertex_state_file = filesystem::OpenFile(vertex_state_path, "wb");
++  if (!draw_state_file || !texture_state_file || !vertex_state_file) {
++    XELOGE("Unable to open trace state output files");
++    if (draw_state_file) {
++      fclose(draw_state_file);
++    }
++    if (texture_state_file) {
++      fclose(texture_state_file);
++    }
++    if (vertex_state_file) {
++      fclose(vertex_state_file);
++    }
++    EndHostCapture();
++    player_.reset();
++    emulator_.reset();
++    return 3;
++  }
++
++  fprintf(
++      draw_state_file,
++      "command\ttype\tedram_mode\trb_modecontrol\trb_surface_info\t"
++      "rb_color_info0\trb_color_info1\trb_color_info2\trb_color_info3\t"
++      "rb_depth_info\trb_color_mask\trb_depthcontrol\trb_copy_control\t"
++      "rb_copy_dest_base\trb_copy_dest_pitch\trb_copy_dest_info\t"
++      "rb_copy_func\trb_copy_ref\trb_copy_mask\trb_copy_surface_slice\t"
++      "window_scissor_tl\twindow_scissor_br\tvs_hash\tps_hash\t"
++      "vs_texture_count\tps_texture_count\tvgt_draw_initiator\t"
++      "vgt_dma_base\tvgt_dma_size\tvgt_indx_offset\t"
++      "vgt_min_vtx_indx\tvgt_max_vtx_indx\n");
++  fprintf(texture_state_file,
++          "command\tstage\tshader_hash\tbinding\tfetch_constant\t"
++          "dword0\tdword1\tdword2\tdword3\tdword4\tdword5\ttype\t"
++          "format\tendian\tbase_address\tpitch_pixels\ttiled\tstacked\t"
++          "dimension\twidth\theight\tdepth\tnum_format\tswizzle\t"
++          "exp_adjust\tmip_address\n");
++  fprintf(vertex_state_file,
++          "command\tshader_hash\tbinding\tfetch_constant\tstride_words\t"
++          "dword0\tdword1\ttype\tendian\tbase_address\tsize_words\n");
++
++  auto* command_processor = graphics_system_->command_processor();
++  auto& regs = *graphics_system_->register_file();
++  for (size_t command_index = 0; command_index < frame->commands.size();
++       ++command_index) {
++    player_->SeekCommand(static_cast<int>(command_index));
++    player_->WaitOnPlayback();
++
++    const auto& command = frame->commands[command_index];
++    const bool is_draw =
++        command.type == TraceReader::Frame::Command::Type::kDraw;
++    Shader* vertex_shader = command_processor->active_vertex_shader();
++    Shader* pixel_shader = command_processor->active_pixel_shader();
++    const uint64_t vertex_shader_hash =
++        vertex_shader ? vertex_shader->ucode_data_hash() : 0;
++    const uint64_t pixel_shader_hash =
++        pixel_shader ? pixel_shader->ucode_data_hash() : 0;
++    const size_t vertex_texture_count =
++        vertex_shader ? vertex_shader->texture_bindings().size() : 0;
++    const size_t pixel_texture_count =
++        pixel_shader ? pixel_shader->texture_bindings().size() : 0;
++
++    fprintf(
++        draw_state_file,
++        "%zu\t%s\t%u\t%08X\t%08X\t%08X\t%08X\t%08X\t%08X\t%08X\t"
++        "%08X\t%08X\t%08X\t%08X\t%08X\t%08X\t%08X\t%08X\t%08X\t"
++        "%08X\t%08X\t%08X\t%016llX\t%016llX\t%zu\t%zu\t%08X\t"
++        "%08X\t%08X\t%08X\t%08X\t%08X\n",
++        command_index, is_draw ? "draw" : "swap",
++        regs[XE_GPU_REG_RB_MODECONTROL] & 7,
++        regs[XE_GPU_REG_RB_MODECONTROL], regs[XE_GPU_REG_RB_SURFACE_INFO],
++        regs[reg::RB_COLOR_INFO::rt_register_indices[0]],
++        regs[reg::RB_COLOR_INFO::rt_register_indices[1]],
++        regs[reg::RB_COLOR_INFO::rt_register_indices[2]],
++        regs[reg::RB_COLOR_INFO::rt_register_indices[3]],
++        regs[XE_GPU_REG_RB_DEPTH_INFO], regs[XE_GPU_REG_RB_COLOR_MASK],
++        regs[XE_GPU_REG_RB_DEPTHCONTROL], regs[XE_GPU_REG_RB_COPY_CONTROL],
++        regs[XE_GPU_REG_RB_COPY_DEST_BASE],
++        regs[XE_GPU_REG_RB_COPY_DEST_PITCH],
++        regs[XE_GPU_REG_RB_COPY_DEST_INFO], regs[XE_GPU_REG_RB_COPY_FUNC],
++        regs[XE_GPU_REG_RB_COPY_REF], regs[XE_GPU_REG_RB_COPY_MASK],
++        regs[XE_GPU_REG_RB_COPY_SURFACE_SLICE],
++        regs[XE_GPU_REG_PA_SC_WINDOW_SCISSOR_TL],
++        regs[XE_GPU_REG_PA_SC_WINDOW_SCISSOR_BR],
++        static_cast<unsigned long long>(vertex_shader_hash),
++        static_cast<unsigned long long>(pixel_shader_hash),
++        vertex_texture_count, pixel_texture_count,
++        regs[XE_GPU_REG_VGT_DRAW_INITIATOR], regs[XE_GPU_REG_VGT_DMA_BASE],
++        regs[XE_GPU_REG_VGT_DMA_SIZE], regs[XE_GPU_REG_VGT_INDX_OFFSET],
++        regs[XE_GPU_REG_VGT_MIN_VTX_INDX],
++        regs[XE_GPU_REG_VGT_MAX_VTX_INDX]);
++
++    // AC6 resolves its 1280x720 scene texture to this guest-memory surface.
++    // With d3d12_readback_resolve enabled, the CPU mirror contains the exact
++    // bytes subsequently consumed by the texture upload path. Keeping this
++    // dump in the trace tool makes the Xenos resolve result directly
++    // comparable with XeO3 without modifying the emulator proper.
++    if (is_draw && (regs[XE_GPU_REG_RB_MODECONTROL] & 7) ==
++                       uint32_t(EdramMode::kCopy) &&
++        regs[XE_GPU_REG_RB_COPY_DEST_BASE] == 0x1B9C0000 &&
++        regs[XE_GPU_REG_RB_COPY_DEST_PITCH] == 0x02D00500 &&
++        regs[XE_GPU_REG_RB_COPY_DEST_INFO] == 0x01000302) {
++      constexpr size_t kAc6ResolveBytes = 1280u * 736u * 4u;
++      auto resolve_path = base_output_path_;
++      resolve_path += fmt::format(".resolve-{}.bin", command_index);
++      if (FILE* resolve_file = filesystem::OpenFile(resolve_path, "wb")) {
++        fwrite(emulator_->memory()->TranslatePhysical(0x1B9C0000), 1,
++               kAc6ResolveBytes, resolve_file);
++        fclose(resolve_file);
++      }
++    }
++
++    if (!is_draw) {
++      continue;
++    }
++    // Local AC6 diagnostic: retain raw VS constants at each terrain draw.
++    // This only extends the offline trace dumper, never the game runtime.
++    if (vertex_shader_hash == 0x042F34FADAD3F370ull && command_index < 800) {
++      auto constants_path = base_output_path_;
++      constants_path += fmt::format(".terrain-{}-vs-constants.bin", command_index);
++      if (FILE* constants_file = filesystem::OpenFile(constants_path, "wb")) {
++        fwrite(&regs[XE_GPU_REG_SHADER_CONSTANT_000_X], sizeof(uint32_t),
++               256 * 4, constants_file);
++        fclose(constants_file);
++      }
++      if (command_index == 271 && vertex_shader) {
++        for (const auto& binding : vertex_shader->vertex_bindings()) {
++          const auto fetch = regs.GetVertexFetch(binding.fetch_constant);
++          const size_t bytes = size_t(fetch.size) * sizeof(uint32_t);
++          if (bytes == 0 || bytes > 4 * 1024 * 1024) continue;
++          auto data_path = base_output_path_;
++          data_path += fmt::format(".terrain-fetch-{}.bin", binding.fetch_constant);
++          if (FILE* data_file = filesystem::OpenFile(data_path, "wb")) {
++            fwrite(emulator_->memory()->TranslatePhysical(fetch.address << 2),
++                   1, bytes, data_file);
++            fclose(data_file);
++          }
++        }
++      }
++    }
++    if (vertex_shader) {
++      for (const auto& binding : vertex_shader->vertex_bindings()) {
++        const xenos::xe_gpu_vertex_fetch_t fetch =
++            regs.GetVertexFetch(binding.fetch_constant);
++        fprintf(vertex_state_file,
++                "%zu\t%016llX\t%d\t%u\t%u\t%08X\t%08X\t%u\t%u\t"
++                "%08X\t%u\n",
++                command_index,
++                static_cast<unsigned long long>(vertex_shader_hash),
++                binding.binding_index, binding.fetch_constant,
++                binding.stride_words, fetch.dword_0, fetch.dword_1,
++                uint32_t(fetch.type), uint32_t(fetch.endian),
++                fetch.address << 2, fetch.size);
++      }
++    }
++    auto write_texture_bindings = [&](const char* stage, Shader* shader) {
++      if (!shader) {
++        return;
++      }
++      for (const auto& binding : shader->texture_bindings()) {
++        const xenos::xe_gpu_texture_fetch_t fetch =
++            regs.GetTextureFetch(binding.fetch_constant);
++        uint32_t width = 0;
++        uint32_t height = 0;
++        uint32_t depth = 0;
++        switch (fetch.dimension) {
++          case xenos::DataDimension::k1D:
++            width = fetch.size_1d.width + 1;
++            height = 1;
++            depth = 1;
++            break;
++          case xenos::DataDimension::k2DOrStacked:
++          case xenos::DataDimension::kCube:
++            width = fetch.size_2d.width + 1;
++            height = fetch.size_2d.height + 1;
++            depth = fetch.stacked ? fetch.size_2d.stack_depth + 1 : 1;
++            break;
++          case xenos::DataDimension::k3D:
++            width = fetch.size_3d.width + 1;
++            height = fetch.size_3d.height + 1;
++            depth = fetch.size_3d.depth + 1;
++            break;
++        }
++        fprintf(
++            texture_state_file,
++            "%zu\t%s\t%016llX\t%zu\t%u\t%08X\t%08X\t%08X\t%08X\t"
++            "%08X\t%08X\t%u\t%u\t%u\t%08X\t%u\t%u\t%u\t%u\t%u\t"
++            "%u\t%u\t%u\t%03X\t%d\t%08X\n",
++            command_index, stage,
++            static_cast<unsigned long long>(shader->ucode_data_hash()),
++            binding.binding_index, binding.fetch_constant, fetch.dword_0,
++            fetch.dword_1, fetch.dword_2, fetch.dword_3, fetch.dword_4,
++            fetch.dword_5, uint32_t(fetch.type), uint32_t(fetch.format),
++            uint32_t(fetch.endianness), fetch.base_address << 12,
++            fetch.pitch << 5, fetch.tiled, fetch.stacked,
++            uint32_t(fetch.dimension), width, height, depth, fetch.num_format,
++            fetch.swizzle, fetch.exp_adjust, fetch.mip_address << 12);
++      }
++    };
++    write_texture_bindings("vs", vertex_shader);
++    write_texture_bindings("ps", pixel_shader);
++  }
++  fclose(draw_state_file);
++  fclose(texture_state_file);
++  fclose(vertex_state_file);
+   EndHostCapture();
+ 
+   // Capture.
+diff --git a/xenia-build b/xenia-build
+index d8c2be56..fdccdfa6 100755
+--- a/xenia-build
++++ b/xenia-build
+@@ -37,6 +37,9 @@ if sys.platform == 'linux':
+ 
+ 
+ def import_subprocess_environment(args):
++    # Python 3.14 no longer accepts an argument sequence with shell=True.
++    if isinstance(args, (list, tuple)):
++        args = subprocess.list2cmdline(args)
+     popen = subprocess.Popen(
+         args, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
+     variables, _ = popen.communicate()
+@@ -93,7 +96,12 @@ def import_vs_environment():
+         version = int(vswhere[0].get("catalog", {}).get("productLineVersion", 2017))
+         install_path = vswhere[0].get("installationPath", None)
+ 
+-    if version < 2017:
++    if version == 18:
++        # Premake 5 doesn't have a vs18 action yet. Visual Studio 18 can load
++        # and build the vs2022 project format used by this Xenia revision.
++        version = 2022
++
++    if version == 2015 or version < 15:
+         if 'VS140COMNTOOLS' in os.environ:
+             version = 2015
+             vcvars_path = os.environ['VS140COMNTOOLS']

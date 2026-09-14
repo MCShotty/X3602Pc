@@ -4,7 +4,10 @@ param(
     [Parameter(Mandatory)]
     [string]$DvdRoot,
     [Parameter(Mandatory)]
-    [string]$ConfigPath
+    [string]$ConfigPath,
+    [string]$ShaderCacheRoot,
+    [string]$VgpuPath,
+    [string]$KernelAotPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,6 +15,10 @@ $ErrorActionPreference = 'Stop'
 $LabRoot = [System.IO.Path]::GetFullPath($LabRoot)
 $DvdRoot = [System.IO.Path]::GetFullPath($DvdRoot)
 $ConfigPath = [System.IO.Path]::GetFullPath($ConfigPath)
+if (-not $ShaderCacheRoot) {
+    $ShaderCacheRoot = Join-Path $LabRoot 'Storage\ShaderCache\XeO3_ShaderCache'
+}
+$ShaderCacheRoot = [System.IO.Path]::GetFullPath($ShaderCacheRoot)
 
 $configText = [System.IO.File]::ReadAllText($ConfigPath)
 $titleMatch = [System.Text.RegularExpressions.Regex]::Match(
@@ -24,10 +31,17 @@ if (-not $titleMatch.Success) {
 $titleId = $titleMatch.Groups[1].Value.ToUpperInvariant()
 
 $aotName = 'xeo3_58f9e24a_5e717488_0670684a_5afca9cb_3f697be6.dll'
+if (-not $VgpuPath -or -not $KernelAotPath) {
+    $validatedHost = & (Join-Path $PSScriptRoot 'test-ac6-host-profile.ps1') `
+        -LabRoot $LabRoot -DvdRoot $DvdRoot
+    $VgpuPath = $validatedHost.VgpuPath
+    $KernelAotPath = $validatedHost.KernelAotPath
+}
 $inputs = [ordered]@{
     AotDll = Join-Path $LabRoot $aotName
     Emu = Join-Path $LabRoot 'Emu.exe'
-    Vgpu = Join-Path $LabRoot 'VGPUDX12.dll'
+    Vgpu = $VgpuPath
+    KernelAot = $KernelAotPath
     D3d12Core = Join-Path $LabRoot 'D3D12Core.dll'
     LaunchArguments = $ConfigPath
     DefaultXex = Join-Path $DvdRoot 'default.xex'
@@ -78,9 +92,7 @@ try {
     $sha256.Dispose()
 }
 
-$cacheRoot = [System.IO.Path]::GetFullPath(
-    (Join-Path $LabRoot 'Storage\ShaderCache\XeO3_ShaderCache')
-)
+$cacheRoot = $ShaderCacheRoot
 $titleCache = [System.IO.Path]::GetFullPath(
     (Join-Path $cacheRoot $titleId)
 )
@@ -136,7 +148,7 @@ if ($fingerprintChanged -and $cacheEntries.Count -gt 0) {
 New-Item -ItemType Directory -Path $titleCache -Force | Out-Null
 
 $state = [ordered]@{
-    schemaVersion = 2
+    schemaVersion = 3
     titleId = $titleId
     fingerprint = $fingerprint
     recordedAt = (Get-Date).ToString('o')

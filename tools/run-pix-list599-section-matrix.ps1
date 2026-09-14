@@ -3,6 +3,9 @@ param(
     [string]$ReplayPath = 'out\pix\ac6-vpos-exposure-gameplay-export-build\Emu.exe',
     [string]$WorkingDirectory = 'out\pix\ac6-vpos-exposure-gameplay-export-build',
     [string]$OutputDirectory = 'out\pix\list599-section-matrix',
+    [switch]$ClearResource323AfterRestore,
+    [switch]$ClearResource321AfterRestore,
+    [int[]]$Sections = @(-1, 0, 1, 2, 3, 4, 5),
     [ValidateRange(10, 180)]
     [int]$ReadinessTimeoutSeconds = 120
 )
@@ -30,6 +33,8 @@ $names = @(
     'AC6_PSO523_RESOLVE_PS',
     'AC6_PSO523_EVENT2051_DIRECT_RESOLVE',
     'AC6_LIST599_MAX_SECTION',
+    'AC6_CLEAR_RESOURCE323_AFTER_RESTORE',
+    'AC6_CLEAR_RESOURCE321_AFTER_RESTORE',
     'AC6_RESOURCE329_SNAPSHOT_STAGE',
     'AC6_FINAL_SOURCE_RESOURCE242',
     'AC6_FINAL_SOURCE_RESOURCE246',
@@ -53,8 +58,15 @@ try {
     $env:AC6_FINAL_SOURCE_RESOURCE246 = '0'
     $env:AC6_FINAL_SOURCE_RESOURCE329 = '0'
     $env:AC6_FINAL_SOURCE_RESOURCE329_SNAPSHOT = '1'
+    $env:AC6_CLEAR_RESOURCE323_AFTER_RESTORE =
+        if ($ClearResource323AfterRestore) { '1' } else { '0' }
+    $env:AC6_CLEAR_RESOURCE321_AFTER_RESTORE =
+        if ($ClearResource321AfterRestore) { '1' } else { '0' }
 
-    foreach ($section in -1..5) {
+    foreach ($section in $Sections) {
+        if ($section -lt -1 -or $section -gt 5) {
+            throw "Invalid list 599 section: $section"
+        }
         $env:AC6_LIST599_MAX_SECTION = [string]$section
         $startedUtc = [DateTime]::UtcNow
         $process = $null

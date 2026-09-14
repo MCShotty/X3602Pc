@@ -211,6 +211,67 @@ void CopyToXeO3(
     destination.setIar(source.iar);
 }
 
+void CopyIntegerFromXeO3(
+    const CpuStateView source,
+    TranslatedState& destination) noexcept
+{
+    for (std::size_t index = 0; index < kGprMembers.size(); ++index)
+    {
+        (destination.ppc.*kGprMembers[index]).u64 = source.gpr(index);
+    }
+
+    for (std::size_t index = 0; index < kCrMembers.size(); ++index)
+    {
+        const auto field = source.condition(index);
+        auto& target = destination.ppc.*kCrMembers[index];
+        std::memcpy(&target, &field, sizeof(target));
+    }
+
+    destination.ppc.lr = source.lr();
+    destination.ppc.ctr.u64 = source.ctr();
+    destination.ppc.xer.so = static_cast<std::uint8_t>(source.xerSo());
+    destination.ppc.xer.ov = static_cast<std::uint8_t>(source.xerOv());
+    destination.ppc.xer.ca = static_cast<std::uint8_t>(source.xerCa());
+    destination.xerByteCount = source.xerByteCount();
+    destination.msr = source.msr();
+    destination.ppc.msr = static_cast<std::uint32_t>(destination.msr);
+    SetTranslatedIar(
+        destination,
+        static_cast<std::uint32_t>(source.iar()));
+}
+
+void CopyIntegerToXeO3(
+    TranslatedState& source,
+    CpuStateView destination) noexcept
+{
+    for (std::size_t index = 0; index < kGprMembers.size(); ++index)
+    {
+        destination.setGpr(
+            index,
+            (source.ppc.*kGprMembers[index]).u64);
+    }
+
+    for (std::size_t index = 0; index < kCrMembers.size(); ++index)
+    {
+        const auto& field = source.ppc.*kCrMembers[index];
+        CpuStateView::ConditionField target{};
+        std::memcpy(&target, &field, sizeof(target));
+        destination.setCondition(index, target);
+    }
+
+    destination.setLr(source.ppc.lr);
+    destination.setCtr(source.ppc.ctr.u64);
+    destination.setXer(
+        source.ppc.xer.so != 0,
+        source.ppc.xer.ov != 0,
+        source.ppc.xer.ca != 0,
+        source.xerByteCount);
+    destination.setMsr(
+        (source.msr & 0xFFFFFFFF00000000ULL) | source.ppc.msr);
+    source.iar = source.ppc.xeo3GuestIar;
+    destination.setIar(source.iar);
+}
+
 void SetTranslatedIar(
     TranslatedState& state,
     const std::uint32_t guestIar) noexcept

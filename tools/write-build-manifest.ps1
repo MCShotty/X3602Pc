@@ -4,8 +4,7 @@ param(
     [string]$VgpuPath,
     [string]$KernelPath =
         'D:\Games\AC6 shit\XeO3-AC6-lab\Flash\xboxkrnlcf.bin',
-    [string]$KernelAotPath =
-        'D:\Games\AC6 shit\XeO3-AC6-lab\xeo3_5fb3687c_001748c4.dll',
+    [string]$KernelAotPath,
     [string]$AotDllPath,
     [string]$AotPdbPath,
     [string]$BuildRoot,
@@ -123,11 +122,18 @@ $package = Get-AppxPackage `
 if (-not $VgpuPath) {
     $VgpuPath = Join-Path $package.InstallLocation 'VGPUDX12.dll'
 }
+if (-not $KernelAotPath) {
+    $KernelAotPath = Join-Path (Split-Path -Parent $EmuPath) 'xeo3_5fb3687c_001748c4.dll'
+}
+if ($package.Version -ne [version]'2608.3123.1.0') {
+    throw "Unsupported XeO3 package version: $($package.Version)"
+}
 
 $expectedHashes = [ordered]@{
     $XexPath = '6EEFBA42CDFE9121207E534D8D290009C98B1A8C60AE5334A33A4F15167CBBBC'
     $EmuPath = 'D1578E07B533E391D8A81C330D5493BA2D45B252490A818EC148DABE1BA24D06'
-    $VgpuPath = '17BDCD5866B58DBC50C8BB8C8EC5F9D9BEDFBA81D31DE530760FDE38A8E0EB1D'
+    $VgpuPath = '8306B4C06B100CAE18F91DCCD0468C2210CCA11A02D928025DE59BD827610247'
+    $KernelAotPath = '27CA5876B505361F00C3E1021FF06B68CD666987D4B517C934D69AADF44E8651'
     $KernelPath = 'DA5BE614FB51B5809D70DA073F406F071E5CCB1F8C0EBCD57DAFBAB31B519BDD'
 }
 foreach ($entry in $expectedHashes.GetEnumerator()) {
@@ -241,7 +247,12 @@ if ($addressTakenFunctions.Count -ne 404 -or
 }
 $cmakeCachePath = Join-Path $BuildRoot 'CMakeCache.txt'
 $buildType = $null
+$continuousStatePublicationEnabled = $false
 if (Test-Path -LiteralPath $cmakeCachePath) {
+    $continuousStatePublicationEnabled = [bool](
+        Get-Content -LiteralPath $cmakeCachePath |
+            Where-Object { $_ -match '^XEO3_CONTINUOUS_STATE_PUBLICATION:BOOL=(ON|TRUE|1)$' }
+    )
     $buildTypeLine = Get-Content -LiteralPath $cmakeCachePath |
         Where-Object { $_ -match '^CMAKE_BUILD_TYPE:' } |
         Select-Object -First 1
@@ -294,7 +305,7 @@ $pso341WidthFixShaderArtifact = Get-Artifact (
 )
 
 $manifest = [ordered]@{
-    schemaVersion = 19
+    schemaVersion = 30
     generatedAtUtc = [DateTime]::UtcNow.ToString('o')
     repository = [ordered]@{
         branch = $branch
@@ -326,6 +337,14 @@ $manifest = [ordered]@{
         packageName = $package.Name
         packageFamilyName = $package.PackageFamilyName
         packageVersion = $package.Version.ToString()
+        vdSwapTrace = [ordered]@{
+            enabledByDefault = $false
+            importThunk = '0x823D05BC'
+            maximumSubmissions = 16
+            behavior = 'read-only before/after snapshots of native VdSwap fetch, ringbuffer and argument memory; no guest writes'
+            filePattern = 'ProbeLogs/ac6-vdswap-PID.jsonl'
+            telemetry = @('BridgeVdSwapTraceEnabled', 'BridgeVdSwapTraceCount', 'BridgeVdSwapTraceFailure')
+        }
         emu = [ordered]@{
             path = $EmuPath
             sha256 = Get-Sha256 $EmuPath
@@ -346,20 +365,77 @@ $manifest = [ordered]@{
         vgpuDx12 = [ordered]@{
             path = $VgpuPath
             sha256 = Get-Sha256 $VgpuPath
+            g2hContextTrace = [ordered]@{
+                enabledByDefault = $false
+                maximumRecords = 1024
+                requiresCallerRvas = @('0x92AA', '0xCC44')
+                savedMetadataStackOffset = '0x28'
+                behavior = 'read-only before/after endian fields and native texture metadata; both callers, fixed instructions, frame geometry and format must match'
+                filePattern = 'ProbeLogs/ac6-g2h-context-PID.jsonl'
+                telemetry = @('BridgeVgpuG2HTraceEnabled', 'BridgeVgpuG2HTraceCount', 'BridgeVgpuG2HTraceFailure')
+            }
+            pixEdramBoundFallback = [ordered]@{
+                requiresModule = 'WinPixGpuCapturer.dll'
+                opaqueCachedBlobSize = 848
+                opaqueCachedBlobSha256 = '13C9E5C82BA93ED0C1BE12D4137ECD15F8A145E44E02DCE5205DF21A13B4E7B2'
+                identity = 'per-draw exact EDRAM constants, draw shape, UINT RTV, sample count and bound root tables; opaque blob is never cached as shader identity'
+                createRenderTargetViewSlot = 20
+                omSetRenderTargetsSlot = 46
+                descriptorCopySlots = @(23, 24)
+                nonConstantViewInvalidationSlots = @(18, 19)
+                descriptorShadow = 'copy GPU address values from tracked or pinned fixed-pool CBVs; invalidate non-CBV replacements; bounded allocation-free lookup'
+                normalCachedBlobPathUnchanged = $true
+                telemetry = @('BridgeVgpuPixEdramBoundMatchCount', 'BridgeVgpuPixEdramBoundRejectCount', 'BridgeVgpuPixEdramResolveFailure', 'BridgeVgpuRtvHookInstalled', 'BridgeVgpuRtvHookFailure', 'BridgeVgpuPixDescriptorCopyCount', 'BridgeVgpuPixConstantCopyCount', 'BridgeVgpuPixDescriptorHookFailure')
+            }
+            failedPipelineCapture = [ordered]@{
+                maximumFailures = 32
+                artifacts = @('VS', 'PS', 'GS', 'HS', 'DS', 'pointer-redacted x64 descriptor', 'D3D12 info queue')
+                latchedTelemetry = @('BridgeVgpuPipelineStateLastFailureResult', 'BridgeVgpuPipelineStateLastFailureCreateSequence')
+            }
+            aircraftRestartCorrection = [ordered]@{
+                sourceBytes = 4807
+                sourceSha256 = '50680B1FA845879FD68EB39A34B8482036625E13B8D306BABF94CDC42D8E2A4A'
+                behavior = 'restart-relative strip parity and rejection of reset-index triangles, using the same bounded resolver as the pinned sky and terrain shaders'
+                telemetry = 'BridgeVgpuAircraftRestartShaderCount'
+                evidence = 'PSO560 readback changes only the aircraft region; captured 7668-index draw has 1638 restart markers and maximum segment length 11'
+            }
+            shadowRestartCorrection = [ordered]@{
+                sourceBytes = 4299
+                restartScanLimit = 128
+                maximumCapturedSegmentLength = 105
+                sourceSha256 = '6C0EDF6CA947E47A849C87FBD64C52C194CB134D7D2BDBEF02A7904FAD56FE42'
+                behavior = 'restart-relative winding for the pinned stencil shadow-volume shader; retain native stencil increment/decrement and shadow application'
+                telemetry = 'BridgeVgpuShadowRestartShaderCount'
+                evidence = 'PSO534 A/B changes the broken self-shadow revealed by PSO537 draw 1273; no culling, stencil, or pixel-shader state is changed'
+            }
+            drawLocalVertexId = [ordered]@{
+                behavior = 'SV_VertexID already excludes StartVertexLocation; preserve it for primitive expansion and apply the guest vertexOffset only after index lookup'
+                specification = 'https://microsoft.github.io/hlsl-specs/proposals/0015-extended-command-info/'
+                evidence = 'Post-VS stream output for terrain bases 0, 160 and 2840 matches all 33774 predicted positions and clipping flags after removing the extra subtraction'
+            }
+            textureUnpackEndianCorrection = [ordered]@{
+                enabledByDefault = $true
+                exactSignatures = @(@(0, 2, 4, 1, 6, 14400), @(0, 2, 4, 1, 6, 468))
+                replacementEndian = 0
+                scopes = @('1280x720 full frame', '208x144 target preview')
+                telemetry = @('BridgeVgpuTextureEndianFixCount', 'BridgeVgpuTexturePreviewEndianFixCount')
+                behavior = 'change only the endian word for the two exact transfer signatures; retain all other texture transfers and native synchronization'
+                evidence = '208x144 replay correction changes exactly 29952 pixels within [980,153,1188,297); the remainder of the final frame is byte-identical'
+            }
             nullPipelineStateGuard = [ordered]@{
-                guardedRva = '0x0000E8A6'
-                normalResumeRva = '0x0000E8B8'
-                skippedDrawResumeRva = '0x0000E88E'
+                guardedRva = '0x0000E926'
+                normalResumeRva = '0x0000E938'
+                skippedDrawResumeRva = '0x0000E90E'
                 expectedBytes =
                     '488993181000008B0348C1E005488B4C1808'
                 behavior =
                     'drop null-PSO draw, clear active-record flag, retain cached PSO'
                 crashSignature =
-                    'VGPUDX12+0xE8C1 SetPipelineState(nullptr), amdxc64 null read'
+                    'VGPUDX12+0xE941 SetPipelineState(nullptr), amdxc64 null read'
             }
             corruptEdramRestoreDrawGuard = [ordered]@{
-                guardedRva = '0x0000E8A6'
-                skippedDrawResumeRva = '0x0000E88E'
+                guardedRva = '0x0000E926'
+                skippedDrawResumeRva = '0x0000E90E'
                 cachedBlobBytes = 954
                 cachedBlobSha256 =
                     '52737028BAFA144C68484A495F7572F1179EA7B9F1188FB99AD6A99061DD28C4'
@@ -370,7 +446,7 @@ $manifest = [ordered]@{
                     'drop only the exact fingerprinted corrupt EDRAM restore draw'
             }
             hostEdramRestoreDrawGuard = [ordered]@{
-                enabledByDefault = $true
+                enabledByDefault = $false
                 cachedBlobBytes = 954
                 acceptedLoadPipelineSha256 = @(
                     '5EE6E2C421A6E2F131171E1B2E1C2B5E6F77F2A1E36B25DD998A5912AF179711',
@@ -460,7 +536,7 @@ $manifest = [ordered]@{
             imageTimestamp = '0x6A588000'
             imageSize = '0x0013E000'
         }
-        profile = 'profiles/xeo3/2607.2223.1.0-D1578E07.json'
+        profile = 'profiles/xeo3/2608.3123.1.0-D1578E07.json'
         kernelContinuation = [ordered]@{
             guestIar = '0x8005F0B4'
             effectiveEntry = '0x8005F0B8'
@@ -580,10 +656,16 @@ $manifest = [ordered]@{
             }
         )
         stateSynchronization = [ordered]@{
-            mode = 'fully-eager-asynchronous-coherence'
+            mode = if ($continuousStatePublicationEnabled) {
+                'fully-eager-asynchronous-coherence'
+            } else {
+                'boundary-synchronized'
+            }
+            continuousPublicationEnabled = $continuousStatePublicationEnabled
             localIarField = 'PPCContext::xeo3GuestIar'
+            indirectCallCheckpointEnabledByDefault = $false
             indirectCallCheckpointInterval = 16
-            eagerState = @(
+            availableEagerState = @(
                 'IAR',
                 'all GPRs',
                 'CR fields',
@@ -600,13 +682,12 @@ $manifest = [ordered]@{
                 'native import',
                 'native dispatch fallback',
                 'MMIO callback',
-                'translated dispatch exit',
-                'periodic indirect-call checkpoint'
+                'translated dispatch exit'
             )
             cpuStateCompilerBarrier =
                 'std::atomic_signal_fence(std::memory_order_seq_cst)'
             reason =
-                'live Mission 01 regression proved XeO3 asynchronous scheduling observes integer, floating-point, and vector state'
+                'continuous publication follows the actual CMake option; optional indirect checkpoints require BridgeIndirectStateSyncEnabled; mission stability remains unverified'
         }
     }
     output = [ordered]@{

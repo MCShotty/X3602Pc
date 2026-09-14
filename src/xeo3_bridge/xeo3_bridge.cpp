@@ -1,4 +1,9 @@
 #include "xeo3_bridge/xenonrecomp_overrides.h"
+#include "xeo3_bridge/ac6_audio_poll.h"
+#include "xeo3_bridge/ac6_vd_swap_trace.h"
+#include "xeo3_bridge/ac6_fast_critical_section.h"
+#include "xeo3_bridge/ac6_fast_irql.h"
+#include "xeo3_bridge/ac6_fast_spin_lock.h"
 #include "xeo3_bridge/ac6_sync_dvd_io.h"
 #include "xeo3_bridge/fiber_frame_registry.h"
 #include "xeo3_bridge/xeo3_host_unmapped_observer.h"
@@ -81,6 +86,13 @@ struct BridgeThreadImportState
 
 static_assert(sizeof(BridgeThreadImportState) == 96);
 
+constexpr std::size_t kAc6ImportCount = 0
+#define XEO3_AC6_IMPORT(index, address, name) +1
+#include "ac6_imports.inc"
+#undef XEO3_AC6_IMPORT
+    ;
+static_assert(kAc6ImportCount == 229);
+
 extern "C"
 {
 __declspec(dllexport) std::uintptr_t
@@ -96,9 +108,82 @@ __declspec(dllexport) std::uint32_t PrecompiledImportTable[] = {
 
 __declspec(dllexport) volatile std::uint64_t BridgeDispatchCount = 0;
 __declspec(dllexport) volatile std::uint64_t BridgeImportCount = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeImportCountersEnabled = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeImportCounterCount =
+    static_cast<std::uint32_t>(kAc6ImportCount);
+alignas(64) __declspec(dllexport) volatile std::uint64_t
+    BridgeImportCounts[kAc6ImportCount]{};
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFunctionLookupEntryCount = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeIntegerImportSyncEnabled = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeIntegerImportSyncAttemptCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeIntegerImportSyncHitCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeIntegerImportSyncFallbackCount = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeIntegerImportSyncLastThunk = 0;
 __declspec(dllexport) volatile std::uint32_t BridgeEventTraceEnabled = 0;
 __declspec(dllexport) volatile std::uint32_t BridgeThreadImportTraceEnabled = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFastSynchronizationTelemetryEnabled = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFastCriticalSectionsEnabled = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastCriticalSectionAttemptCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastCriticalSectionHitCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastCriticalSectionFallbackCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastCriticalSectionSignalCount = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFastCriticalSectionLastThunk = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFastCriticalSectionLastAddress = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFastCriticalSectionLastThread = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFastCriticalSectionLastDisposition = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeFastSpinLocksEnabled = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastSpinLockAttemptCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastSpinLockHitCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastSpinLockFallbackCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastSpinLockContentionCount = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFastSpinLockLastThunk = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFastSpinLockLastAddress = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeFastIrqlEnabled = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeFastIrqlTelemetryEnabled = 0;
+__declspec(dllexport) volatile std::uint64_t BridgeFastIrqlAttemptCount = 0;
+__declspec(dllexport) volatile std::uint64_t BridgeFastIrqlHitCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastIrqlNativeFallbackCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeFastIrqlInvalidFallbackCount = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeFastIrqlLastThunk = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeFastIrqlLastOldIrql = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeFastIrqlLastNewIrql = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeFastIrqlLastPendingIrql = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeRaiseIrqlOldPassiveCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeRaiseIrqlOldApcCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeRaiseIrqlOldDispatchCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeRaiseIrqlUnexpectedCount = 0;
 __declspec(dllexport) volatile std::uint64_t BridgeIndirectCallCount = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeIndirectTelemetryEnabled = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeIndirectStateSyncEnabled = 0;
 __declspec(dllexport) volatile std::uint32_t BridgeLastIndirectTarget = 0;
 __declspec(dllexport) volatile std::uint32_t BridgeLastIndirectCallerIar = 0;
 __declspec(dllexport) volatile std::uint64_t BridgeFatalIndirectCount = 0;
@@ -136,6 +221,54 @@ __declspec(dllexport) volatile std::uint32_t BridgeActiveWorkerPrimaryThreadId =
 __declspec(dllexport) volatile std::uint64_t BridgeActiveWorkerPrimaryClaimCount = 0;
 __declspec(dllexport) volatile std::uint32_t BridgeLastWorkerDestroyTarget = 0;
 __declspec(dllexport) volatile std::uint32_t BridgeLastWorkerDestroyObject = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollClockFallbackEnabled = 1;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollTraceEnabled = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeGuestIarTelemetryEnabled = 0;
+#if defined(XEO3_CONTINUOUS_STATE_PUBLICATION)
+__declspec(dllexport) volatile std::uint32_t
+    BridgeContinuousStatePublicationMode = 1;
+#else
+__declspec(dllexport) volatile std::uint32_t
+    BridgeContinuousStatePublicationMode = 0;
+#endif
+__declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollCallCount = 0;
+__declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollReturnCount = 0;
+__declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollSampleCount = 0;
+__declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollContinueCount = 0;
+__declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollTimeoutCount = 0;
+__declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollExitCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeAc6AudioPollTimeBaseSampleCount = 0;
+__declspec(dllexport) volatile std::uint64_t
+    BridgeAc6AudioPollClockFallbackCount = 0;
+__declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollDelayCount = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastGuestIar = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastThreadId = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastObject = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastFrame = 0;
+__declspec(dllexport) volatile std::uintptr_t BridgeAc6AudioPollLastGuestMemory = 0;
+__declspec(dllexport) volatile std::uint64_t BridgeAc6AudioPollLastTimeBase = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastGlobalTick = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastGlobalClock = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastObjectClock = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastBaselineTick = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastDelta = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollLastConsumerPointer = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollLastConsumerValue = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollLastObservedConsumer = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollLastRequiredDistance = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollLastAvailableDistance = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeAc6AudioPollLastReturn = 0;
+__declspec(dllexport) volatile std::uint32_t
+    BridgeAc6AudioPollLastResolvedTick = 0;
+__declspec(dllexport) volatile std::uint32_t BridgeSynchronousQueueEnabled = 1;
+__declspec(dllexport) volatile std::uint64_t BridgeSynchronousQueueBypassCount = 0;
 __declspec(dllexport) volatile std::uint64_t BridgeSynchronousQueueSubmitCount = 0;
 __declspec(dllexport) volatile std::uint64_t BridgeSynchronousQueueTaskCount = 0;
 __declspec(dllexport) volatile std::uint64_t BridgeSynchronousQueueFailureCount = 0;
@@ -296,6 +429,127 @@ void BridgeQueueWaitCooperativeYield(
     }
 }
 
+void BridgeAc6AudioPollObserve(
+    const std::uint32_t guestIar,
+    const std::uint32_t r3,
+    const std::uint32_t r9,
+    const std::uint32_t r10,
+    const std::uint64_t r11,
+    const std::uint32_t,
+    const std::uint32_t r29,
+    const std::uint32_t r30,
+    const std::uint32_t r31) noexcept
+{
+    BridgeAc6AudioPollLastGuestIar = guestIar;
+    BridgeAc6AudioPollLastThreadId = GetCurrentThreadId();
+    BridgeAc6AudioPollLastGuestMemory = BridgeLastGuestMemory;
+
+    switch (guestIar)
+    {
+    case 0x821E6238U:
+        BridgeAc6AudioPollTimeBaseSampleCount =
+            BridgeAc6AudioPollTimeBaseSampleCount + 1;
+        BridgeAc6AudioPollLastTimeBase = r11;
+        break;
+    case 0x821E6240U:
+        BridgeAc6AudioPollCallCount = BridgeAc6AudioPollCallCount + 1;
+        break;
+    case 0x821E6248U:
+        BridgeAc6AudioPollReturnCount = BridgeAc6AudioPollReturnCount + 1;
+        BridgeAc6AudioPollLastReturn = r3;
+        break;
+    case 0x821E6264U:
+        BridgeAc6AudioPollLastRequiredDistance = r9;
+        BridgeAc6AudioPollLastAvailableDistance =
+            static_cast<std::uint32_t>(r11);
+        break;
+    case 0x821E6B3CU:
+        BridgeAc6AudioPollLastObject = r29;
+        BridgeAc6AudioPollLastFrame = r31;
+        BridgeAc6AudioPollLastConsumerPointer =
+            static_cast<std::uint32_t>(r11);
+        BridgeAc6AudioPollLastConsumerValue = r9;
+        BridgeAc6AudioPollLastObservedConsumer = r10;
+        break;
+    case 0x821E6B70U:
+        BridgeAc6AudioPollSampleCount = BridgeAc6AudioPollSampleCount + 1;
+        BridgeAc6AudioPollLastObject = r29;
+        BridgeAc6AudioPollLastFrame = r31;
+        BridgeAc6AudioPollLastGlobalTick = r30;
+        BridgeAc6AudioPollLastGlobalClock = r3;
+        BridgeAc6AudioPollLastObjectClock =
+            static_cast<std::uint32_t>(r11);
+        break;
+    case 0x821E6B74U:
+        BridgeAc6AudioPollLastBaselineTick =
+            static_cast<std::uint32_t>(r11);
+        break;
+    case 0x821E6B78U:
+        BridgeAc6AudioPollLastDelta = static_cast<std::uint32_t>(r11);
+        break;
+    case 0x821E6B80U:
+        BridgeAc6AudioPollContinueCount =
+            BridgeAc6AudioPollContinueCount + 1;
+        break;
+    case 0x821E6B88U:
+        BridgeAc6AudioPollTimeoutCount =
+            BridgeAc6AudioPollTimeoutCount + 1;
+        break;
+    case 0x821E6B90U:
+        BridgeAc6AudioPollExitCount = BridgeAc6AudioPollExitCount + 1;
+        break;
+    default:
+        break;
+    }
+}
+
+std::uint32_t BridgeAc6AudioPollResolveTick(
+    const std::uint32_t guestTick,
+    std::uint8_t* const guestMemory,
+    const std::uint32_t frameAddress) noexcept
+{
+    constexpr auto baselineOffset = std::uint32_t{12};
+    const auto frameAddressValid =
+        guestMemory != nullptr &&
+        frameAddress <= std::numeric_limits<std::uint32_t>::max() -
+            baselineOffset;
+    const auto fallbackEnabled =
+        BridgeAc6AudioPollClockFallbackEnabled != 0 && frameAddressValid;
+    const auto baselineAddress = frameAddress + baselineOffset;
+    auto encodedBaselineTick = std::uint32_t{0};
+    if (fallbackEnabled)
+    {
+        std::memcpy(
+            &encodedBaselineTick,
+            xeo3::GuestMemoryPointer(guestMemory, baselineAddress),
+            sizeof(encodedBaselineTick));
+    }
+    const auto baselineTick = _byteswap_ulong(encodedBaselineTick);
+    const auto hostTick = guestTick == 0 && fallbackEnabled
+        ? GetTickCount()
+        : 0;
+    const auto resolution = xeo3::ac6_audio::ResolvePollTick(
+        guestTick,
+        baselineTick,
+        hostTick,
+        fallbackEnabled);
+    if (resolution.initializeBaseline)
+    {
+        const auto encodedResolvedTick = _byteswap_ulong(resolution.tick);
+        std::memcpy(
+            xeo3::GuestMemoryPointer(guestMemory, baselineAddress),
+            &encodedResolvedTick,
+            sizeof(encodedResolvedTick));
+    }
+    if (resolution.usedFallback && BridgeAc6AudioPollTraceEnabled != 0)
+    {
+        BridgeAc6AudioPollClockFallbackCount =
+            BridgeAc6AudioPollClockFallbackCount + 1;
+        BridgeAc6AudioPollLastResolvedTick = resolution.tick;
+    }
+    return resolution.tick;
+}
+
 void XeO3AotThunk();
 void XeO3CallMappedGuest(
     void* cpuState,
@@ -395,6 +649,12 @@ void ReleaseWorkerPrimarySlot(
 
 constexpr std::uint32_t kImageBase = 0x82000000;
 constexpr std::uint32_t kImageSize = 0x00AA0000;
+
+enum class NestedStateSync
+{
+    full,
+    integerOnly,
+};
 constexpr DWORD kBridgeException = 0xE0423603;
 constexpr DWORD kExpectedEmuTimestamp = 0x6A585A77;
 constexpr DWORD kExpectedEmuImageSize = 0x00D97000;
@@ -497,6 +757,7 @@ struct CodeLengthEventRing
 };
 
 std::vector<xeo3::MappingEntry> g_mappings;
+std::vector<PPCFunc*> g_functionLookup;
 void* g_hostInterface = nullptr;
 std::size_t g_functionCount = 0;
 std::atomic<std::uint64_t> g_eventSequence{0};
@@ -825,6 +1086,16 @@ ActiveFrame* FindActiveFrame(
     PPCContext& context,
     std::uint8_t* guestMemory) noexcept
 {
+    auto* const directFrame =
+        static_cast<ActiveFrame*>(context.xeo3ActiveFrame);
+    if (directFrame != nullptr &&
+        directFrame->translated != nullptr &&
+        &directFrame->translated->ppc == &context &&
+        directFrame->guestMemory == guestMemory)
+    {
+        return directFrame;
+    }
+
     return g_activeFrames.find(
         [&](const ActiveFrame& frame)
         {
@@ -843,22 +1114,20 @@ PPCFunc* FindFunction(const std::uint32_t guestAddress) noexcept
         return continuation;
     }
 
-    const auto* const begin = PPCFuncMappings;
-    const auto* const end = begin + g_functionCount;
-    const auto* const found = std::lower_bound(
-        begin,
-        end,
-        static_cast<std::size_t>(guestAddress),
-        [](const PPCFuncMapping& mapping, const std::size_t address)
-        {
-            return mapping.guest < address;
-        });
-
-    if (found == end || found->guest != guestAddress)
+    if (guestAddress < kImageBase)
     {
         return nullptr;
     }
-    return found->host;
+    const auto relativeAddress = guestAddress - kImageBase;
+    if (relativeAddress >= kImageSize || (relativeAddress & 3U) != 0)
+    {
+        return nullptr;
+    }
+
+    const auto index = static_cast<std::size_t>(relativeAddress >> 2U);
+    return index < g_functionLookup.size()
+        ? g_functionLookup[index]
+        : nullptr;
 }
 
 void EnsureKernelContinuationReady(
@@ -882,7 +1151,7 @@ void EnsureKernelContinuationReady(
     }
 }
 
-void ExecuteViaXeO3(
+bool ExecuteViaXeO3(
     PPCContext& context,
     std::uint8_t* guestMemory,
     const std::uint32_t sourceIar,
@@ -890,7 +1159,8 @@ void ExecuteViaXeO3(
     const EventKind eventKind,
     const std::uint32_t detail,
     const std::uint32_t missingExecuteReason,
-    void* const directHostTarget = nullptr)
+    void* const directHostTarget = nullptr,
+    const NestedStateSync requestedStateSync = NestedStateSync::full)
 {
     auto* const frame = FindActiveFrame(context, guestMemory);
     xeo3::TranslatedState recovered{};
@@ -923,6 +1193,7 @@ void ExecuteViaXeO3(
             xeo3::CpuStateView(cpuState),
             recovered);
         recovered.ppc = context;
+        recovered.ppc.xeo3ActiveFrame = nullptr;
         BridgeRecoveredContextCount =
             BridgeRecoveredContextCount + 1;
         EmitEvent(
@@ -931,7 +1202,11 @@ void ExecuteViaXeO3(
             targetIar,
             0);
     }
+    const auto useIntegerStateSync =
+        frame != nullptr &&
+        requestedStateSync == NestedStateSync::integerOnly;
     translated->ppc.xeo3CpuState = cpuState;
+    translated->ppc.xeo3GuestMemory = guestMemory;
     // ExecuteViaXeO3 requires an active outer dispatch frame, and that frame
     // installs the continuation before it is registered. Rechecking the same
     // dispatch slot on every nested import made this path run hundreds of
@@ -945,9 +1220,18 @@ void ExecuteViaXeO3(
     }
 
     xeo3::SetTranslatedIar(*translated, sourceIar);
-    xeo3::CopyToXeO3(
-        *translated,
-        xeo3::CpuStateView(cpuState));
+    if (useIntegerStateSync)
+    {
+        xeo3::CopyIntegerToXeO3(
+            *translated,
+            xeo3::CpuStateView(cpuState));
+    }
+    else
+    {
+        xeo3::CopyToXeO3(
+            *translated,
+            xeo3::CpuStateView(cpuState));
+    }
     EmitEvent(eventKind, sourceIar, targetIar, detail);
     BridgeLastNestedHostFence = reinterpret_cast<std::uintptr_t>(hostFence);
     if (directHostTarget == nullptr)
@@ -967,14 +1251,24 @@ void ExecuteViaXeO3(
             directHostTarget,
             hostFence);
     }
-    xeo3::CopyFromXeO3(
-        xeo3::CpuStateView(cpuState),
-        *translated);
+    if (useIntegerStateSync)
+    {
+        xeo3::CopyIntegerFromXeO3(
+            xeo3::CpuStateView(cpuState),
+            *translated);
+    }
+    else
+    {
+        xeo3::CopyFromXeO3(
+            xeo3::CpuStateView(cpuState),
+            *translated);
+    }
 
     if (frame == nullptr)
     {
         context = recovered.ppc;
     }
+    return useIntegerStateSync;
 }
 
 void ExecuteKernelMappedGuest(
@@ -1056,6 +1350,36 @@ constexpr std::uint32_t kTargetCriticalSection = 0x826A1918;
 constexpr std::uint32_t kRtlEnterCriticalSectionThunk = 0x823D007C;
 constexpr std::uint32_t kRtlLeaveCriticalSectionThunk = 0x823D008C;
 constexpr std::uint32_t kRtlTryEnterCriticalSectionThunk = 0x823D00AC;
+constexpr std::uint32_t kKeSetEventThunk = 0x823D056C;
+constexpr std::size_t kKeSetEventImportIndex = 117;
+constexpr std::uint32_t kKeReleaseSpinLockFromRaisedIrqlThunk = 0x823D04AC;
+constexpr std::uint32_t kKeAcquireSpinLockAtRaisedIrqlThunk = 0x823D04DC;
+constexpr std::uint32_t kKeTryToAcquireSpinLockAtRaisedIrqlThunk = 0x823D0BDC;
+constexpr std::uint32_t kKeRaiseIrqlToDpcLevelThunk = 0x823D0BBC;
+constexpr std::uint32_t kKfLowerIrqlThunk = 0x823D0BCC;
+constexpr std::size_t kGuestAddressSpaceSize = 0x1'0000'0000ULL;
+
+constexpr bool SupportsIntegerImportSync(const std::uint32_t thunk) noexcept
+{
+    switch (thunk)
+    {
+    case 0x823D049CU: // MmGetPhysicalAddress
+    case 0x823D09FCU: // KeTlsGetValue
+        return true;
+    default:
+        return false;
+    }
+}
+
+// Synchronization and IRQL imports are deliberately excluded. A live AC6 run
+// deadlocked on a permanently-owned guest spin lock after these imports used
+// partial state synchronization. Their XeO3 implementations may reschedule or
+// deliver work that mutates state outside the integer subset.
+static_assert(!SupportsIntegerImportSync(kKeReleaseSpinLockFromRaisedIrqlThunk));
+static_assert(!SupportsIntegerImportSync(kKeAcquireSpinLockAtRaisedIrqlThunk));
+static_assert(!SupportsIntegerImportSync(kKeTryToAcquireSpinLockAtRaisedIrqlThunk));
+static_assert(!SupportsIntegerImportSync(kKeRaiseIrqlToDpcLevelThunk));
+static_assert(!SupportsIntegerImportSync(kKfLowerIrqlThunk));
 
 struct CriticalSectionSnapshot
 {
@@ -1071,7 +1395,8 @@ bool IsTracedCriticalSectionImport(
     const std::uint32_t thunk,
     const std::uint32_t lockAddress) noexcept
 {
-    return lockAddress == kTargetCriticalSection &&
+    return BridgeEventTraceEnabled != 0 &&
+        lockAddress == kTargetCriticalSection &&
         (thunk == kRtlEnterCriticalSectionThunk ||
          thunk == kRtlLeaveCriticalSectionThunk ||
          thunk == kRtlTryEnterCriticalSectionThunk);
@@ -1770,6 +2095,297 @@ bool TryExecuteSynchronousArchiveRead(
     return true;
 }
 
+bool TryExecuteFastCriticalSection(
+    PPCContext& context,
+    std::uint8_t* const guestMemory,
+    const std::uint32_t thunk) noexcept
+{
+    if (BridgeFastCriticalSectionsEnabled == 0 ||
+        (thunk != kRtlEnterCriticalSectionThunk &&
+         thunk != kRtlLeaveCriticalSectionThunk &&
+         thunk != kRtlTryEnterCriticalSectionThunk))
+    {
+        return false;
+    }
+
+    const auto trace = BridgeFastSynchronizationTelemetryEnabled != 0 ||
+        BridgeThreadImportTraceEnabled != 0;
+    if (trace)
+    {
+        InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+            &BridgeFastCriticalSectionAttemptCount));
+    }
+    const auto criticalSectionAddress = context.r3.u32;
+    std::uint32_t currentThread = 0;
+    if (!xeo3::fast_sync::ReadCurrentThread(
+            guestMemory,
+            kGuestAddressSpaceSize,
+            context.r13.u32,
+            currentThread))
+    {
+        if (trace)
+        {
+            InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+                &BridgeFastCriticalSectionFallbackCount));
+        }
+        return false;
+    }
+
+    ActiveFrame* signalFrame = nullptr;
+    std::uint32_t signalTarget = 0;
+    if (thunk == kRtlLeaveCriticalSectionThunk)
+    {
+        if (PrecompiledImportTable[kKeSetEventImportIndex * 2] !=
+                kKeSetEventThunk ||
+            (signalTarget = PrecompiledImportTable[
+                kKeSetEventImportIndex * 2 + 1]) == 0 ||
+            (signalFrame = FindActiveFrame(context, guestMemory)) == nullptr)
+        {
+            if (trace)
+            {
+                InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+                    &BridgeFastCriticalSectionFallbackCount));
+            }
+            return false;
+        }
+    }
+
+    auto result = xeo3::fast_sync::CriticalSectionResult{};
+    if (thunk == kRtlLeaveCriticalSectionThunk)
+    {
+        result = xeo3::fast_sync::LeaveCriticalSection(
+            guestMemory,
+            kGuestAddressSpaceSize,
+            criticalSectionAddress,
+            currentThread);
+    }
+    else
+    {
+        result = xeo3::fast_sync::EnterCriticalSection(
+            guestMemory,
+            kGuestAddressSpaceSize,
+            criticalSectionAddress,
+            currentThread,
+            thunk == kRtlTryEnterCriticalSectionThunk
+                ? xeo3::fast_sync::EnterMode::tryOnly
+                : xeo3::fast_sync::EnterMode::wait);
+    }
+
+    if (result.disposition == xeo3::fast_sync::Disposition::fallback)
+    {
+        if (trace)
+        {
+            InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+                &BridgeFastCriticalSectionFallbackCount));
+        }
+        return false;
+    }
+
+    if (thunk == kRtlTryEnterCriticalSectionThunk)
+    {
+        context.r3.u64 = result.returnValue;
+    }
+    if (result.disposition ==
+        xeo3::fast_sync::Disposition::completedAndSignal)
+    {
+        const auto savedContext = context;
+        const auto savedIar =
+            signalFrame->translated->ppc.xeo3GuestIar;
+        context.r3.u64 = criticalSectionAddress;
+        context.r4.u64 = 1;
+        context.r5.u64 = 0;
+        ExecuteViaXeO3(
+            context,
+            guestMemory,
+            kKeSetEventThunk,
+            signalTarget,
+            EventKind::Import,
+            static_cast<std::uint32_t>(kKeSetEventImportIndex),
+            5);
+        context = savedContext;
+        xeo3::SetTranslatedIar(*signalFrame->translated, savedIar);
+        xeo3::CopyToXeO3(
+            *signalFrame->translated,
+            xeo3::CpuStateView(signalFrame->cpuState));
+        if (trace)
+        {
+            InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+                &BridgeFastCriticalSectionSignalCount));
+        }
+    }
+
+    if (trace)
+    {
+        InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+            &BridgeFastCriticalSectionHitCount));
+        BridgeFastCriticalSectionLastThunk = thunk;
+        BridgeFastCriticalSectionLastAddress = criticalSectionAddress;
+        BridgeFastCriticalSectionLastThread = currentThread;
+        BridgeFastCriticalSectionLastDisposition =
+            static_cast<std::uint32_t>(result.disposition);
+    }
+    return true;
+}
+
+bool TryExecuteFastSpinLock(
+    PPCContext& context,
+    std::uint8_t* const guestMemory,
+    const std::uint32_t thunk) noexcept
+{
+    if (BridgeFastSpinLocksEnabled == 0 ||
+        (thunk != kKeAcquireSpinLockAtRaisedIrqlThunk &&
+         thunk != kKeTryToAcquireSpinLockAtRaisedIrqlThunk &&
+         thunk != kKeReleaseSpinLockFromRaisedIrqlThunk))
+    {
+        return false;
+    }
+
+    const auto trace = BridgeFastSynchronizationTelemetryEnabled != 0 ||
+        BridgeThreadImportTraceEnabled != 0;
+    if (trace)
+    {
+        InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+            &BridgeFastSpinLockAttemptCount));
+    }
+    const auto spinLockAddress = context.r3.u32;
+    auto result = xeo3::fast_spin::SpinLockResult{};
+    if (thunk == kKeReleaseSpinLockFromRaisedIrqlThunk)
+    {
+        result = xeo3::fast_spin::ReleaseSpinLock(
+            guestMemory,
+            kGuestAddressSpaceSize,
+            spinLockAddress);
+    }
+    else
+    {
+        result = xeo3::fast_spin::AcquireSpinLock(
+            guestMemory,
+            kGuestAddressSpaceSize,
+            spinLockAddress,
+            thunk == kKeTryToAcquireSpinLockAtRaisedIrqlThunk
+                ? xeo3::fast_spin::AcquireMode::tryOnly
+                : xeo3::fast_spin::AcquireMode::wait);
+    }
+
+    if (trace && result.contended)
+    {
+        InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+            &BridgeFastSpinLockContentionCount));
+    }
+    if (result.disposition == xeo3::fast_spin::Disposition::fallback)
+    {
+        if (trace)
+        {
+            InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+                &BridgeFastSpinLockFallbackCount));
+        }
+        return false;
+    }
+
+    if (thunk == kKeTryToAcquireSpinLockAtRaisedIrqlThunk)
+    {
+        context.r3.u64 = result.returnValue;
+    }
+    if (trace)
+    {
+        InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+            &BridgeFastSpinLockHitCount));
+        BridgeFastSpinLockLastThunk = thunk;
+        BridgeFastSpinLockLastAddress = spinLockAddress;
+    }
+    return true;
+}
+
+bool TryExecuteFastIrql(
+    PPCContext& context,
+    std::uint8_t* const guestMemory,
+    const std::uint32_t thunk) noexcept
+{
+    if (BridgeFastIrqlEnabled == 0 ||
+        (thunk != kKeRaiseIrqlToDpcLevelThunk &&
+         thunk != kKfLowerIrqlThunk))
+    {
+        return false;
+    }
+
+    const auto trace = BridgeFastIrqlTelemetryEnabled != 0;
+    if (trace)
+    {
+        InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+            &BridgeFastIrqlAttemptCount));
+        BridgeFastIrqlLastThunk = thunk;
+    }
+
+    if (thunk == kKeRaiseIrqlToDpcLevelThunk)
+    {
+        const auto result = xeo3::fast_irql::RaiseToDpc(
+            guestMemory,
+            kGuestAddressSpaceSize,
+            context.r13.u32);
+        if (result.disposition !=
+            xeo3::fast_irql::Disposition::completed)
+        {
+            if (trace)
+            {
+                InterlockedIncrement64(
+                    reinterpret_cast<volatile LONG64*>(
+                        &BridgeFastIrqlInvalidFallbackCount));
+            }
+            return false;
+        }
+
+        context.r3.u64 = result.oldIrql;
+        if (trace)
+        {
+            BridgeFastIrqlLastOldIrql = result.oldIrql;
+            BridgeFastIrqlLastNewIrql =
+                xeo3::fast_irql::kDispatchLevel;
+            BridgeFastIrqlLastPendingIrql = 0;
+            InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+                &BridgeFastIrqlHitCount));
+        }
+        return true;
+    }
+
+    const auto newIrql = context.r3.u32;
+    const auto result = xeo3::fast_irql::Lower(
+        guestMemory,
+        kGuestAddressSpaceSize,
+        context.r13.u32,
+        newIrql);
+    if (trace)
+    {
+        BridgeFastIrqlLastNewIrql = newIrql;
+        BridgeFastIrqlLastPendingIrql = result.pendingIrql;
+    }
+    if (result.disposition ==
+        xeo3::fast_irql::Disposition::nativeCheckRequired)
+    {
+        if (trace)
+        {
+            InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+                &BridgeFastIrqlNativeFallbackCount));
+        }
+        return false;
+    }
+    if (result.disposition != xeo3::fast_irql::Disposition::completed)
+    {
+        if (trace)
+        {
+            InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+                &BridgeFastIrqlInvalidFallbackCount));
+        }
+        return false;
+    }
+
+    if (trace)
+    {
+        InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+            &BridgeFastIrqlHitCount));
+    }
+    return true;
+}
+
 void ExecuteImport(
     PPCContext& context,
     std::uint8_t* guestMemory,
@@ -1790,6 +2406,11 @@ void ExecuteImport(
             CaptureCriticalSectionSnapshot(context, guestMemory);
     }
     BridgeImportCount = BridgeImportCount + 1;
+    if (BridgeImportCountersEnabled != 0 && index < kAc6ImportCount)
+    {
+        InterlockedIncrement64(
+            reinterpret_cast<volatile LONG64*>(&BridgeImportCounts[index]));
+    }
     BridgeLastImportThunk = thunk;
     BridgeLastImportTarget = target;
     auto* const threadImportState = RecordThreadImportBefore(
@@ -1812,14 +2433,77 @@ void ExecuteImport(
         return;
     }
 
-    ExecuteViaXeO3(
+    if (TryExecuteFastCriticalSection(context, guestMemory, thunk))
+    {
+        RecordThreadImportAfter(threadImportState, context);
+        return;
+    }
+
+    if (TryExecuteFastSpinLock(context, guestMemory, thunk))
+    {
+        RecordThreadImportAfter(threadImportState, context);
+        return;
+    }
+
+    if (TryExecuteFastIrql(context, guestMemory, thunk))
+    {
+        RecordThreadImportAfter(threadImportState, context);
+        return;
+    }
+
+    const auto requestIntegerSync =
+        BridgeIntegerImportSyncEnabled != 0 &&
+        SupportsIntegerImportSync(thunk);
+    if (requestIntegerSync)
+    {
+        BridgeIntegerImportSyncAttemptCount =
+            BridgeIntegerImportSyncAttemptCount + 1;
+    }
+    const auto usedIntegerSync = ExecuteViaXeO3(
         context,
         guestMemory,
         thunk,
         target,
         EventKind::Import,
         static_cast<std::uint32_t>(index),
-        5);
+        5,
+        nullptr,
+        requestIntegerSync
+            ? NestedStateSync::integerOnly
+            : NestedStateSync::full);
+    if (requestIntegerSync)
+    {
+        if (usedIntegerSync)
+        {
+            BridgeIntegerImportSyncHitCount =
+                BridgeIntegerImportSyncHitCount + 1;
+            BridgeIntegerImportSyncLastThunk = thunk;
+        }
+        else
+        {
+            BridgeIntegerImportSyncFallbackCount =
+                BridgeIntegerImportSyncFallbackCount + 1;
+        }
+    }
+    if (thunk == kKeRaiseIrqlToDpcLevelThunk)
+    {
+        auto* counter = &BridgeRaiseIrqlUnexpectedCount;
+        switch (context.r3.u32)
+        {
+        case 0:
+            counter = &BridgeRaiseIrqlOldPassiveCount;
+            break;
+        case 1:
+            counter = &BridgeRaiseIrqlOldApcCount;
+            break;
+        case 2:
+            counter = &BridgeRaiseIrqlOldDispatchCount;
+            break;
+        default:
+            break;
+        }
+        InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(counter));
+    }
     RecordSynchronizationImport(
         context,
         thunk,
@@ -1883,14 +2567,19 @@ std::uint32_t NegotiateVersion(const std::uint32_t requestedVersion) noexcept
 
 bool BuildMappings() noexcept
 {
+    constexpr auto kFunctionLookupEntryCount =
+        (static_cast<std::size_t>(kImageSize) + 3U) / 4U;
     g_functionCount = 0;
+    g_functionLookup.clear();
+    BridgeFunctionLookupEntryCount = 0;
     while (PPCFuncMappings[g_functionCount].guest != 0)
     {
         const auto& mapping = PPCFuncMappings[g_functionCount];
         if (mapping.host == nullptr ||
             mapping.guest < kImageBase ||
             mapping.guest >=
-                static_cast<std::uint64_t>(kImageBase) + kImageSize)
+                static_cast<std::uint64_t>(kImageBase) + kImageSize ||
+            ((mapping.guest - kImageBase) & 3U) != 0)
         {
             return false;
         }
@@ -1915,9 +2604,12 @@ bool BuildMappings() noexcept
     try
     {
         g_mappings.resize(g_functionCount);
+        g_functionLookup.assign(kFunctionLookupEntryCount, nullptr);
     }
     catch (...)
     {
+        g_mappings.clear();
+        g_functionLookup.clear();
         return false;
     }
 
@@ -1928,7 +2620,18 @@ bool BuildMappings() noexcept
                 PPCFuncMappings[index].guest - kImageBase),
             static_cast<std::uint32_t>(thunkRva),
         };
+        const auto lookupIndex = static_cast<std::size_t>(
+            (PPCFuncMappings[index].guest - kImageBase) >> 2U);
+        if (g_functionLookup[lookupIndex] != nullptr)
+        {
+            g_mappings.clear();
+            g_functionLookup.clear();
+            return false;
+        }
+        g_functionLookup[lookupIndex] = PPCFuncMappings[index].host;
     }
+    BridgeFunctionLookupEntryCount =
+        static_cast<std::uint32_t>(g_functionLookup.size());
     return true;
 }
 }
@@ -1974,20 +2677,25 @@ void CallIndirect(
     std::uint8_t* guestMemory,
     const std::uint32_t guestAddress)
 {
-    if (context.xeo3IndirectCallsUntilSync <= 1U)
+    if (BridgeIndirectStateSyncEnabled != 0 &&
+        context.xeo3IndirectCallsUntilSync <= 1U)
     {
         context.xeo3IndirectCallsUntilSync =
             kIndirectStateSyncInterval;
         static_cast<void>(PublishActiveState(context, guestMemory));
     }
-    else
+    else if (BridgeIndirectStateSyncEnabled != 0)
     {
         --context.xeo3IndirectCallsUntilSync;
     }
-    BridgeIndirectCallCount = BridgeIndirectCallCount + 1;
-    BridgeLastIndirectTarget = guestAddress;
     const auto callerIar = context.xeo3GuestIar;
-    BridgeLastIndirectCallerIar = callerIar;
+    if (BridgeIndirectTelemetryEnabled != 0)
+    {
+        InterlockedIncrement64(reinterpret_cast<volatile LONG64*>(
+            &BridgeIndirectCallCount));
+        BridgeLastIndirectTarget = guestAddress;
+        BridgeLastIndirectCallerIar = callerIar;
+    }
     if (guestAddress == 0x8237FF40U)
     {
         const auto object = context.r3.u32;
@@ -2010,18 +2718,37 @@ void CallIndirect(
         BridgeLastFatalIndirectArgument4 = context.r4.u64;
         BridgeLastFatalIndirectThreadId = GetCurrentThreadId();
     }
-    if (callerIar == 0x823464BCU || callerIar == 0x823464DCU)
+    const auto workerPrimary = callerIar == 0x823464BCU;
+    const auto workerDestroy = callerIar == 0x823464DCU;
+    if (!workerPrimary && !workerDestroy)
     {
-        BridgeWorkerCallbackTargetCount =
-            BridgeWorkerCallbackTargetCount + 1;
-        BridgeLastWorkerCallbackTarget = guestAddress;
-        BridgeLastWorkerCallbackCallerIar = callerIar;
+        if (auto* const function = FindFunction(guestAddress);
+            function != nullptr)
+        {
+            function(context, guestMemory);
+            return;
+        }
+
+        ExecuteViaXeO3(
+            context,
+            guestMemory,
+            guestAddress,
+            guestAddress,
+            EventKind::IndirectFallback,
+            0,
+            2);
+        return;
     }
+
+    BridgeWorkerCallbackTargetCount =
+        BridgeWorkerCallbackTargetCount + 1;
+    BridgeLastWorkerCallbackTarget = guestAddress;
+    BridgeLastWorkerCallbackCallerIar = callerIar;
     const auto workerObject = context.r3.u32;
     const auto workerThreadId = GetCurrentThreadId();
     bool ownsActiveWorkerPrimary = false;
     int workerPrimarySlot = -1;
-    if (callerIar == 0x823464BCU)
+    if (workerPrimary)
     {
         std::uint64_t storedPayload = 0;
         std::memcpy(
@@ -2052,7 +2779,7 @@ void CallIndirect(
             ownsActiveWorkerPrimary = true;
         }
     }
-    else if (callerIar == 0x823464DCU)
+    else if (workerDestroy)
     {
         BridgeLastWorkerDestroyTarget = guestAddress;
         BridgeLastWorkerDestroyObject = workerObject;
@@ -3859,6 +4586,7 @@ extern "C" void XeO3Dispatch(
     xeo3::TranslatedState translated{};
     xeo3::CopyFromXeO3(xeo3::CpuStateView(cpuState), translated);
     translated.ppc.xeo3CpuState = cpuState;
+    translated.ppc.xeo3GuestMemory = guestMemory;
     xeo3::SetTranslatedIar(translated, guestIar);
 
     ActiveFrame frame{
@@ -3868,6 +4596,7 @@ extern "C" void XeO3Dispatch(
         hostFence,
         nullptr,
     };
+    translated.ppc.xeo3ActiveFrame = &frame;
     if (!RegisterActiveFrame(frame))
     {
         Fail(guestIar, 0, 11);
@@ -3899,6 +4628,7 @@ extern "C" void XeO3Dispatch(
     {
         Fail(guestIar, 0, 12);
     }
+    translated.ppc.xeo3ActiveFrame = nullptr;
     _mm_setcsr(hostMxcsr);
 }
 
@@ -3909,10 +4639,54 @@ extern "C" std::uint32_t InitPrecompiledDll(
     std::uint32_t options[2])
 {
     g_eventSequence.store(0, std::memory_order_relaxed);
+    xeo3::video::ResetSwapTrace();
     g_criticalSectionEventSequence.store(0, std::memory_order_relaxed);
     g_huffmanInputCaptured.store(false, std::memory_order_relaxed);
     g_targetLockTryFailureStreak = 0;
     BridgeCriticalSectionEventCount = 0;
+    BridgeImportCountersEnabled = 0;
+    for (auto& count : BridgeImportCounts)
+    {
+        count = 0;
+    }
+    BridgeIntegerImportSyncEnabled = 0;
+    BridgeIntegerImportSyncAttemptCount = 0;
+    BridgeIntegerImportSyncHitCount = 0;
+    BridgeIntegerImportSyncFallbackCount = 0;
+    BridgeIntegerImportSyncLastThunk = 0;
+    BridgeFastSynchronizationTelemetryEnabled = 0;
+    BridgeFastCriticalSectionsEnabled = 0;
+    BridgeFastCriticalSectionAttemptCount = 0;
+    BridgeFastCriticalSectionHitCount = 0;
+    BridgeFastCriticalSectionFallbackCount = 0;
+    BridgeFastCriticalSectionSignalCount = 0;
+    BridgeFastCriticalSectionLastThunk = 0;
+    BridgeFastCriticalSectionLastAddress = 0;
+    BridgeFastCriticalSectionLastThread = 0;
+    BridgeFastCriticalSectionLastDisposition = 0;
+    BridgeFastSpinLocksEnabled = 0;
+    BridgeFastSpinLockAttemptCount = 0;
+    BridgeFastSpinLockHitCount = 0;
+    BridgeFastSpinLockFallbackCount = 0;
+    BridgeFastSpinLockContentionCount = 0;
+    BridgeFastSpinLockLastThunk = 0;
+    BridgeFastSpinLockLastAddress = 0;
+    BridgeFastIrqlEnabled = 0;
+    BridgeFastIrqlTelemetryEnabled = 0;
+    BridgeFastIrqlAttemptCount = 0;
+    BridgeFastIrqlHitCount = 0;
+    BridgeFastIrqlNativeFallbackCount = 0;
+    BridgeFastIrqlInvalidFallbackCount = 0;
+    BridgeFastIrqlLastThunk = 0;
+    BridgeFastIrqlLastOldIrql = 0;
+    BridgeFastIrqlLastNewIrql = 0;
+    BridgeFastIrqlLastPendingIrql = 0;
+    BridgeRaiseIrqlOldPassiveCount = 0;
+    BridgeRaiseIrqlOldApcCount = 0;
+    BridgeRaiseIrqlOldDispatchCount = 0;
+    BridgeRaiseIrqlUnexpectedCount = 0;
+    BridgeIndirectTelemetryEnabled = 0;
+    BridgeIndirectStateSyncEnabled = 0;
     BridgeIndirectCallCount = 0;
     BridgeLastIndirectTarget = 0;
     BridgeLastIndirectCallerIar = 0;
@@ -3951,6 +4725,38 @@ extern "C" std::uint32_t InitPrecompiledDll(
     BridgeActiveWorkerPrimaryClaimCount = 0;
     BridgeLastWorkerDestroyTarget = 0;
     BridgeLastWorkerDestroyObject = 0;
+    BridgeAc6AudioPollClockFallbackEnabled = 1;
+    BridgeAc6AudioPollTraceEnabled = 0;
+    BridgeGuestIarTelemetryEnabled = 0;
+    BridgeAc6AudioPollCallCount = 0;
+    BridgeAc6AudioPollReturnCount = 0;
+    BridgeAc6AudioPollSampleCount = 0;
+    BridgeAc6AudioPollContinueCount = 0;
+    BridgeAc6AudioPollTimeoutCount = 0;
+    BridgeAc6AudioPollExitCount = 0;
+    BridgeAc6AudioPollTimeBaseSampleCount = 0;
+    BridgeAc6AudioPollClockFallbackCount = 0;
+    BridgeAc6AudioPollDelayCount = 0;
+    BridgeAc6AudioPollLastGuestIar = 0;
+    BridgeAc6AudioPollLastThreadId = 0;
+    BridgeAc6AudioPollLastObject = 0;
+    BridgeAc6AudioPollLastFrame = 0;
+    BridgeAc6AudioPollLastGuestMemory = 0;
+    BridgeAc6AudioPollLastTimeBase = 0;
+    BridgeAc6AudioPollLastGlobalTick = 0;
+    BridgeAc6AudioPollLastGlobalClock = 0;
+    BridgeAc6AudioPollLastObjectClock = 0;
+    BridgeAc6AudioPollLastBaselineTick = 0;
+    BridgeAc6AudioPollLastDelta = 0;
+    BridgeAc6AudioPollLastConsumerPointer = 0;
+    BridgeAc6AudioPollLastConsumerValue = 0;
+    BridgeAc6AudioPollLastObservedConsumer = 0;
+    BridgeAc6AudioPollLastRequiredDistance = 0;
+    BridgeAc6AudioPollLastAvailableDistance = 0;
+    BridgeAc6AudioPollLastReturn = 0;
+    BridgeAc6AudioPollLastResolvedTick = 0;
+    BridgeSynchronousQueueEnabled = 1;
+    BridgeSynchronousQueueBypassCount = 0;
     BridgeSynchronousQueueSubmitCount = 0;
     BridgeSynchronousQueueTaskCount = 0;
     BridgeSynchronousQueueFailureCount = 0;
@@ -4111,12 +4917,77 @@ extern "C" void CleanupPrecompiledDll()
     }
     g_hostInterface = nullptr;
     g_functionCount = 0;
+    g_functionLookup.clear();
+    BridgeFunctionLookupEntryCount = 0;
+}
+
+bool HotImportDiagnosticsEnabled() noexcept
+{
+    return BridgeImportCountersEnabled != 0 ||
+        BridgeEventTraceEnabled != 0 ||
+        BridgeThreadImportTraceEnabled != 0 ||
+        BridgeFastSynchronizationTelemetryEnabled != 0 ||
+        BridgeFastIrqlTelemetryEnabled != 0;
+}
+
+template <std::size_t Index, std::uint32_t Thunk>
+void ExecuteImportEntry(
+    PPCContext& context,
+    std::uint8_t* const guestMemory)
+{
+    if constexpr (Thunk == xeo3::video::kVdSwapThunk)
+    {
+        const xeo3::video::SwapArguments arguments{
+            {context.r3.u32, context.r4.u32, context.r5.u32, context.r6.u32,
+             context.r7.u32, context.r8.u32, context.r9.u32, context.r10.u32},
+            context.r1.u32, static_cast<std::uint32_t>(context.lr)};
+        const auto sequence = xeo3::video::BeginSwapTrace(arguments, guestMemory);
+        ExecuteImport(context, guestMemory, Index, Thunk);
+        xeo3::video::EndSwapTrace(sequence, guestMemory, context.r3.u32,
+                                 static_cast<std::uint32_t>(context.lr));
+        return;
+    }
+
+    if (!HotImportDiagnosticsEnabled())
+    {
+        if constexpr (
+            Thunk == kRtlEnterCriticalSectionThunk ||
+            Thunk == kRtlLeaveCriticalSectionThunk ||
+            Thunk == kRtlTryEnterCriticalSectionThunk)
+        {
+            if (TryExecuteFastCriticalSection(context, guestMemory, Thunk))
+            {
+                return;
+            }
+        }
+        else if constexpr (
+            Thunk == kKeAcquireSpinLockAtRaisedIrqlThunk ||
+            Thunk == kKeTryToAcquireSpinLockAtRaisedIrqlThunk ||
+            Thunk == kKeReleaseSpinLockFromRaisedIrqlThunk)
+        {
+            if (TryExecuteFastSpinLock(context, guestMemory, Thunk))
+            {
+                return;
+            }
+        }
+        else if constexpr (
+            Thunk == kKeRaiseIrqlToDpcLevelThunk ||
+            Thunk == kKfLowerIrqlThunk)
+        {
+            if (TryExecuteFastIrql(context, guestMemory, Thunk))
+            {
+                return;
+            }
+        }
+    }
+
+    ExecuteImport(context, guestMemory, Index, Thunk);
 }
 
 #define XEO3_AC6_IMPORT(index, address, name)                  \
     PPC_FUNC(name)                                            \
     {                                                         \
-        ExecuteImport(ctx, base, index, address);              \
+        ExecuteImportEntry<index, address>(ctx, base);         \
     }
 #include "ac6_imports.inc"
 #undef XEO3_AC6_IMPORT
